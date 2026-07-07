@@ -1,0 +1,53 @@
+{
+  "app": "Love Me International Dating App",
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto",
+    "spacing": {
+      "safeAreaTop": "env(safe-area-inset-top,20px)",
+      "safeAreaBottom": "env(safe-area-inset-bottom,4px)+76px"
+    },
+    "radius": {
+      "card": "16px",
+      "cardLarge": "24px",
+      "button": "9999px"
+    }
+  },
+  "screens": [
+    "01_AuthPage.json",
+    "02_EmailVerifiedPage.json",
+    "03_ResetPasswordPage.json",
+    "04_ProfileSetupPage.json",
+    "05_IndexShell.json",
+    "06_DiscoverPage.json",
+    "07_LikesPage.json",
+    "08_MessagesPage.json",
+    "09_ExplorePage.json",
+    "10_ProfilePage.json",
+    "11_ChatPage.json",
+    "12_NotificationsPage.json",
+    "13_SettingsPage.json",
+    "14_DevicesPage.json",
+    "15_SubscriptionPage.json",
+    "16_PrivacyPolicyPage.json",
+    "17_TermsPage.json",
+    "18_RefundPolicyPage.json",
+    "19_ChildSafetyPage.json",
+    "20_SafetyReportsPage.json",
+    "21_DeleteAccountPage.json",
+    "22_AdminDiagnosticsPage.json",
+    "23_NotFoundPage.json"
+  ],
+  "count": 23
+}

@@ -1,0 +1,163 @@
+{
+  "screenName": "SubscriptionPage",
+  "route": "/subscription",
+  "purpose": "Premium plans (Monthly/Quarterly/Yearly) with Paystack, PayPal, Wise, and Google Play checkout.",
+  "navigation": {
+    "from": [
+      "Upgrade CTA anywhere",
+      "UpgradeOverlay (in-app modal)",
+      "openUpgrade()"
+    ],
+    "to": [
+      "Paystack/PayPal checkout URL",
+      "Wise upload flow",
+      "back"
+    ]
+  },
+  "appBar": {
+    "title": "Go Premium",
+    "actions": [
+      "close"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": [
+      "HeroPerks",
+      "PlanCards",
+      "PaymentMethods",
+      "TrialUsageSection",
+      "Legal"
+    ]
+  },
+  "components": [
+    {
+      "id": "perks",
+      "type": "List",
+      "text": "Unlimited likes, See who liked you, Read receipts, Calls, No ads"
+    },
+    {
+      "id": "planCard",
+      "type": "Card",
+      "children": [
+        "title",
+        "price",
+        "duration",
+        "selectBtn"
+      ],
+      "style": {
+        "borderRadius": "20px"
+      }
+    },
+    {
+      "id": "paystackBtn",
+      "type": "Button",
+      "text": "Pay with M-PESA / Card",
+      "icon": "paystack",
+      "action": "functions.invoke('paystack-checkout')"
+    },
+    {
+      "id": "paypalBtn",
+      "type": "Button",
+      "text": "PayPal",
+      "action": "functions.invoke('paypal-checkout')"
+    },
+    {
+      "id": "wiseBtn",
+      "type": "Button",
+      "text": "Wise (bank transfer)",
+      "action": "openWiseUploadDialog"
+    },
+    {
+      "id": "googlePlayBtn",
+      "type": "Button",
+      "text": "Google Play Billing",
+      "visibleWhen": "androidWebView"
+    },
+    {
+      "id": "trialUsage",
+      "type": "Section",
+      "component": "TrialUsageSection"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [
+    {
+      "id": "wiseReceiptUpload",
+      "action": "verify-receipt-upload"
+    }
+  ],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "paystack-checkout",
+      "endpoint": "functions/v1/paystack-checkout"
+    },
+    {
+      "name": "paypal-checkout",
+      "endpoint": "functions/v1/paypal-checkout"
+    },
+    {
+      "name": "wise-verify-ai",
+      "endpoint": "functions/v1/wise-verify-ai"
+    },
+    {
+      "name": "verify-purchase (google play)",
+      "endpoint": "functions/v1/verify-purchase"
+    },
+    {
+      "name": "subscription_plans.select",
+      "endpoint": "rest/v1/subscription_plans"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useSubscription"
+    },
+    {
+      "hook": "usePlanFeatures"
+    },
+    {
+      "local": "selectedPlan,method,loading"
+    }
+  ],
+  "validation": [],
+  "loadingState": {
+    "ui": "button spinner"
+  },
+  "errorState": {
+    "ui": "toast"
+  },
+  "emptyState": {},
+  "successState": {
+    "ui": "redirect to gateway or thank-you toast"
+  },
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

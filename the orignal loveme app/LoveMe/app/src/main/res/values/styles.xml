@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.LoveMe" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/purple_500</item>
+        <item name="colorPrimaryVariant">@color/purple_700</item>
+        <item name="colorSecondary">@color/purple_200</item>
+        <item name="android:statusBarColor">@color/purple_700</item>
+        <item name="android:windowBackground">@color/splash_pink_background</item>
+    </style>
+
+    <style name="Theme.LoveMe.Splash" parent="Theme.LoveMe">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+
+</resources>

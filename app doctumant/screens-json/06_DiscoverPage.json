@@ -1,0 +1,189 @@
+{
+  "screenName": "DiscoverPage",
+  "route": "/",
+  "purpose": "Swipeable stack of nearby profiles filtered by preferences and proximity.",
+  "navigation": {
+    "from": [
+      "BottomNav Discover tab"
+    ],
+    "to": [
+      "/chat/:id (on match)",
+      "/subscription (upgrade)",
+      "profile detail dialog"
+    ]
+  },
+  "appBar": {
+    "title": "Discover",
+    "actions": [
+      "filters",
+      "notifications"
+    ]
+  },
+  "layout": {
+    "type": "cardStack",
+    "children": [
+      "ProfileCard(current)",
+      "ActionRow",
+      "Filters(sheet)"
+    ]
+  },
+  "components": [
+    {
+      "id": "profileCard",
+      "type": "ProfileCard",
+      "style": {
+        "borderRadius": "24px"
+      }
+    },
+    {
+      "id": "photo",
+      "type": "Image",
+      "image": "profile.avatar"
+    },
+    {
+      "id": "name",
+      "type": "Text",
+      "text": "{name}, {age}"
+    },
+    {
+      "id": "distance",
+      "type": "Text",
+      "text": "{km} km away"
+    },
+    {
+      "id": "bio",
+      "type": "Text"
+    },
+    {
+      "id": "dislikeBtn",
+      "type": "IconButton",
+      "icon": "X",
+      "action": "swipeLeft"
+    },
+    {
+      "id": "superLikeBtn",
+      "type": "IconButton",
+      "icon": "Star",
+      "action": "superLike (premium)"
+    },
+    {
+      "id": "likeBtn",
+      "type": "IconButton",
+      "icon": "Heart",
+      "action": "like \u2192 check match"
+    },
+    {
+      "id": "messageBtn",
+      "type": "IconButton",
+      "icon": "MessageCircle",
+      "action": "openChat (premium)"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [
+    {
+      "id": "filtersSheet",
+      "component": "DiscoverFilters"
+    }
+  ],
+  "tabs": [],
+  "filters": [
+    {
+      "name": "ageRange",
+      "type": "Slider",
+      "range": [
+        18,
+        80
+      ]
+    },
+    {
+      "name": "distance",
+      "type": "Slider",
+      "range": [
+        1,
+        500
+      ]
+    },
+    {
+      "name": "gender",
+      "type": "Select"
+    },
+    {
+      "name": "country",
+      "type": "Select"
+    }
+  ],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "get_discover_profiles (rpc)",
+      "endpoint": "rest/v1/rpc/get_discover_profiles"
+    },
+    {
+      "name": "can_send_like (rpc)",
+      "endpoint": "rest/v1/rpc/can_send_like"
+    },
+    {
+      "name": "likes.insert",
+      "endpoint": "rest/v1/likes"
+    },
+    {
+      "name": "record_profile_view (rpc)",
+      "endpoint": "rest/v1/rpc/record_profile_view"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useDiscoverProfiles"
+    },
+    {
+      "hook": "useLikeAndMessageFlow"
+    },
+    {
+      "hook": "useSubscription"
+    }
+  ],
+  "validation": [],
+  "loadingState": {
+    "ui": "skeleton card"
+  },
+  "errorState": {
+    "ui": "retry button"
+  },
+  "emptyState": {
+    "icon": "\ud83d\udd0d",
+    "text": "No more profiles nearby \u2014 widen your filters"
+  },
+  "successState": {
+    "ui": "match modal with confetti"
+  },
+  "assets": [],
+  "animations": [
+    "swipe (framer-motion)",
+    "match confetti"
+  ],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

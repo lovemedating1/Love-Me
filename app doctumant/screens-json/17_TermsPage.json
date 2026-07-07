@@ -1,0 +1,67 @@
+{
+  "screenName": "TermsPage",
+  "route": "/terms",
+  "purpose": "Terms of Service.",
+  "navigation": {
+    "from": [
+      "footer",
+      "/auth signup"
+    ],
+    "to": [
+      "back"
+    ]
+  },
+  "appBar": {
+    "title": "Terms of Service",
+    "actions": [
+      "back"
+    ]
+  },
+  "layout": {
+    "type": "scrollableText"
+  },
+  "components": [
+    {
+      "id": "content",
+      "type": "Prose"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [],
+  "stateManagement": [],
+  "validation": [],
+  "loadingState": {},
+  "errorState": {},
+  "emptyState": {},
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

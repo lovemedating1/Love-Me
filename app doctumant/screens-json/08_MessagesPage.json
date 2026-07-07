@@ -1,0 +1,120 @@
+{
+  "screenName": "MessagesPage",
+  "route": "/messages",
+  "purpose": "Conversation list + Calls history tab with unread badges and real-time updates.",
+  "navigation": {
+    "from": [
+      "BottomNav Messages tab",
+      "Notification tap",
+      "Missed call notification"
+    ],
+    "to": [
+      "/chat/:partnerId"
+    ]
+  },
+  "appBar": {
+    "title": "Messages",
+    "actions": [
+      "search"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [
+    {
+      "id": "conversationItem",
+      "type": "ListItem",
+      "children": [
+        "Avatar+onlineDot",
+        "Name",
+        "LastMessage",
+        "Timestamp",
+        "UnreadBadge"
+      ]
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [
+    {
+      "name": "conversations",
+      "item": "ConversationItem"
+    },
+    {
+      "name": "callHistory",
+      "item": "CallHistoryItem"
+    }
+  ],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [
+    {
+      "name": "Chats"
+    },
+    {
+      "name": "Calls"
+    }
+  ],
+  "filters": [],
+  "search": {
+    "placeholder": "Search chats",
+    "field": "displayName"
+  },
+  "apiCalls": [
+    {
+      "name": "get_conversations (rpc)",
+      "endpoint": "rest/v1/rpc/get_conversations"
+    },
+    {
+      "name": "call_history.select",
+      "endpoint": "rest/v1/call_history"
+    },
+    {
+      "name": "messages realtime",
+      "channel": "postgres_changes:messages"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useAuth"
+    },
+    {
+      "local": "tab,search,conversations"
+    }
+  ],
+  "validation": [],
+  "loadingState": {
+    "ui": "list skeleton"
+  },
+  "errorState": {},
+  "emptyState": {
+    "chats": "No conversations yet",
+    "calls": "No calls yet"
+  },
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

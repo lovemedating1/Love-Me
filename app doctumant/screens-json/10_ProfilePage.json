@@ -1,0 +1,170 @@
+{
+  "screenName": "ProfilePage",
+  "route": "/profile",
+  "purpose": "Current user's profile with photos, bio, stats, and edit/settings entry points.",
+  "navigation": {
+    "from": [
+      "BottomNav Profile tab"
+    ],
+    "to": [
+      "/settings",
+      "/subscription",
+      "/devices",
+      "/delete-account",
+      "EditProfileDialog"
+    ]
+  },
+  "appBar": {
+    "title": "My Profile",
+    "actions": [
+      "settings"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [
+    {
+      "id": "avatar",
+      "type": "Avatar",
+      "size": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    {
+      "id": "editAvatarBtn",
+      "type": "IconButton",
+      "icon": "Camera"
+    },
+    {
+      "id": "displayName",
+      "type": "Text",
+      "style": {
+        "fontSize": "24px",
+        "fontWeight": "700"
+      }
+    },
+    {
+      "id": "verifiedBadge",
+      "type": "Badge",
+      "visibleWhen": "profile.verified"
+    },
+    {
+      "id": "premiumBadge",
+      "type": "Badge",
+      "visibleWhen": "isPremium",
+      "style": {
+        "backgroundColor": "#FFB800"
+      }
+    },
+    {
+      "id": "photoGallery",
+      "type": "Grid",
+      "columns": 3
+    },
+    {
+      "id": "bio",
+      "type": "Text"
+    },
+    {
+      "id": "stats",
+      "type": "Row",
+      "children": [
+        "viewsCount",
+        "likesCount",
+        "matchesCount"
+      ]
+    },
+    {
+      "id": "editBtn",
+      "type": "Button",
+      "text": "Edit Profile",
+      "action": "openEditProfileDialog"
+    },
+    {
+      "id": "upgradeBtn",
+      "type": "Button",
+      "text": "Upgrade to Premium",
+      "visibleWhen": "!isPremium"
+    },
+    {
+      "id": "signOutBtn",
+      "type": "Button",
+      "text": "Sign out",
+      "action": "supabase.auth.signOut"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [
+    {
+      "id": "editProfile",
+      "component": "EditProfileDialog"
+    },
+    {
+      "id": "photoUpload",
+      "component": "PhotoUpload"
+    },
+    {
+      "id": "cropImage",
+      "component": "ImageCropDialog"
+    }
+  ],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "profiles.select",
+      "endpoint": "rest/v1/profiles?id=eq.me"
+    },
+    {
+      "name": "profiles.update",
+      "endpoint": "rest/v1/profiles?id=eq.me"
+    },
+    {
+      "name": "storage.upload(avatars)",
+      "endpoint": "storage/v1/object/avatars"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useAuth"
+    },
+    {
+      "hook": "useSubscription"
+    }
+  ],
+  "validation": [],
+  "loadingState": {},
+  "errorState": {},
+  "emptyState": {},
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

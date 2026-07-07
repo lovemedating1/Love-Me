@@ -1,0 +1,70 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services'
+}
+
+android {
+    namespace 'com.loveme.intldating'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.loveme.intldating"
+        minSdk 24
+        targetSdk 35
+        versionCode 20
+        versionName "20.0"
+    }
+
+    signingConfigs {
+        release {
+            storeFile rootProject.file('loveme.keystore')
+            storePassword 'kami123@'
+            keyAlias 'loveme_key'
+            keyPassword 'kami123@'
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+        release {
+            debuggable false
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+
+    buildFeatures {
+        compose false
+    }
+}
+
+dependencies {
+
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
+    implementation platform('com.google.firebase:firebase-bom:33.4.0')
+    implementation 'com.google.firebase:firebase-messaging-ktx'
+
+    implementation 'com.startapp:inapp-sdk:5.3.0'
+
+    // Google Play Billing — in-app subscriptions (premium plans)
+    implementation 'com.android.billingclient:billing-ktx:7.1.1'
+
+    testImplementation 'junit:junit:4.13.2'
+}

@@ -1,0 +1,111 @@
+{
+  "screenName": "DeleteAccountPage",
+  "route": "/delete-account",
+  "purpose": "Confirm and permanently delete account with cascading data purge.",
+  "navigation": {
+    "from": [
+      "/settings"
+    ],
+    "to": [
+      "/auth"
+    ]
+  },
+  "appBar": {
+    "title": "Delete Account",
+    "actions": [
+      "back"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [
+    {
+      "id": "warning",
+      "type": "Alert",
+      "style": {
+        "backgroundColor": "#EF4444"
+      }
+    },
+    {
+      "id": "reasonSelect",
+      "type": "Select",
+      "name": "reason"
+    },
+    {
+      "id": "typeConfirm",
+      "type": "Input",
+      "name": "confirm",
+      "text": "Type DELETE to confirm"
+    },
+    {
+      "id": "deleteBtn",
+      "type": "Button",
+      "text": "Delete my account",
+      "style": {
+        "backgroundColor": "#EF4444"
+      },
+      "enabledWhen": "confirm === 'DELETE'"
+    }
+  ],
+  "forms": [
+    {
+      "name": "confirm",
+      "fields": [
+        "password",
+        "typedConfirm(DELETE)"
+      ]
+    }
+  ],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "delete-account",
+      "method": "POST",
+      "endpoint": "functions/v1/delete-account"
+    }
+  ],
+  "stateManagement": [],
+  "validation": [
+    {
+      "field": "confirm",
+      "rule": "must equal 'DELETE'"
+    }
+  ],
+  "loadingState": {},
+  "errorState": {},
+  "emptyState": {},
+  "successState": {
+    "ui": "toast + signOut + redirect /auth"
+  },
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

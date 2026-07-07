@@ -1,0 +1,151 @@
+{
+  "screenName": "SettingsPage",
+  "route": "/settings",
+  "purpose": "Account settings: discovery prefs, notifications, privacy, ringtones, legal links, sign out.",
+  "navigation": {
+    "from": [
+      "/profile \u2192 Settings"
+    ],
+    "to": [
+      "/devices",
+      "/delete-account",
+      "/privacy-policy",
+      "/terms",
+      "/refund-policy",
+      "/child-safety",
+      "/safety-reports"
+    ]
+  },
+  "appBar": {
+    "title": "Settings",
+    "actions": [
+      "back"
+    ]
+  },
+  "layout": {
+    "type": "sectionedList"
+  },
+  "components": [
+    {
+      "id": "switch",
+      "type": "Switch"
+    },
+    {
+      "id": "slider",
+      "type": "Slider"
+    },
+    {
+      "id": "select",
+      "type": "Select"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [
+    {
+      "name": "Discovery",
+      "items": [
+        "ageRange",
+        "distance",
+        "gender",
+        "showMeIn"
+      ]
+    },
+    {
+      "name": "Notifications",
+      "items": [
+        "push toggle",
+        "email toggle",
+        "sound",
+        "vibration"
+      ]
+    },
+    {
+      "name": "Privacy",
+      "items": [
+        "hideDistance",
+        "onlineStatus",
+        "screenshotGuard"
+      ]
+    },
+    {
+      "name": "Ringtone",
+      "items": [
+        "ringtonePicker"
+      ]
+    },
+    {
+      "name": "Account",
+      "items": [
+        "signedInDevices",
+        "deleteAccount",
+        "signOut"
+      ]
+    },
+    {
+      "name": "Legal",
+      "items": [
+        "privacy",
+        "terms",
+        "refund",
+        "childSafety"
+      ]
+    }
+  ],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "user_settings.upsert",
+      "endpoint": "rest/v1/user_settings"
+    },
+    {
+      "name": "push subscribe",
+      "hook": "usePushNotifications"
+    }
+  ],
+  "stateManagement": [
+    {
+      "local": "settings"
+    },
+    {
+      "hook": "useAuth"
+    }
+  ],
+  "validation": [
+    {
+      "field": "ageRange",
+      "rule": "min>=18, min<=max"
+    }
+  ],
+  "loadingState": {},
+  "errorState": {},
+  "emptyState": {},
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

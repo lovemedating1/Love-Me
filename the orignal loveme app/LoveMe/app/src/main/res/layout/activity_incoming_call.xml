@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#CC000000">
+
+    <!-- White card centered on screen -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginHorizontal="32dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:background="@drawable/bg_call_card"
+        android:elevation="8dp">
+
+        <!-- "Incoming video call" label -->
+        <TextView
+            android:id="@+id/tvCallType"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Incoming Voice Call"
+            android:textColor="#888888"
+            android:textSize="15sp"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Avatar with pink ring -->
+        <FrameLayout
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_marginBottom="20dp">
+
+            <!-- Pink border ring -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/circle_avatar_border" />
+
+            <!-- Avatar image clipped to circle -->
+            <ImageView
+                android:id="@+id/ivCallerAvatar"
+                android:layout_width="110dp"
+                android:layout_height="110dp"
+                android:layout_gravity="center"
+                android:src="@mipmap/ic_launcher_round"
+                android:scaleType="centerCrop"
+                android:background="@drawable/circle_avatar_bg"
+                android:clipToOutline="true" />
+
+        </FrameLayout>
+
+        <!-- Caller name -->
+        <TextView
+            android:id="@+id/tvCallerName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Someone"
+            android:textColor="#111111"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <!-- "is calling you..." -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="is calling you..."
+            android:textColor="#888888"
+            android:textSize="14sp"
+            android:layout_marginBottom="36dp" />
+
+        <!-- Decline / Accept buttons row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <!-- Decline -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_marginEnd="48dp">
+
+                <ImageButton
+                    android:id="@+id/btnDecline"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:background="@drawable/circle_decline"
+                    android:padding="18dp"
+                    android:contentDescription="Decline" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Decline"
+                    android:textColor="#333333"
+                    android:textSize="13sp"
+                    android:layout_marginTop="8dp" />
+            </LinearLayout>
+
+            <!-- Accept -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/btnAccept"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    android:src="@android:drawable/ic_menu_call"
+                    android:background="@drawable/circle_accept"
+                    android:padding="18dp"
+                    android:contentDescription="Accept" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Accept"
+                    android:textColor="#333333"
+                    android:textSize="13sp"
+                    android:layout_marginTop="8dp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

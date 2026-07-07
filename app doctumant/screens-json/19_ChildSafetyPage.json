@@ -1,0 +1,80 @@
+{
+  "screenName": "ChildSafetyPage",
+  "route": "/child-safety",
+  "purpose": "CSAE standards, reporting mechanism, and policy statement.",
+  "navigation": {
+    "from": [
+      "/settings",
+      "footer"
+    ],
+    "to": [
+      "ReportCsaeDialog"
+    ]
+  },
+  "appBar": {
+    "title": "Child Safety",
+    "actions": [
+      "back"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [
+    {
+      "id": "policy",
+      "type": "Prose"
+    },
+    {
+      "id": "reportBtn",
+      "type": "Button",
+      "text": "Report CSAE",
+      "action": "openReportCsaeDialog"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [
+    {
+      "id": "reportCsae",
+      "component": "ReportCsaeDialog",
+      "api": "notify-safety-report"
+    }
+  ],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [],
+  "stateManagement": [],
+  "validation": [],
+  "loadingState": {},
+  "errorState": {},
+  "emptyState": {},
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

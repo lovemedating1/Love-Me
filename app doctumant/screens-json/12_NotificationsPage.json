@@ -1,0 +1,129 @@
+{
+  "screenName": "NotificationsPage",
+  "route": "/notifications",
+  "purpose": "Paginated list of user notifications (likes, matches, messages, missed calls) with realtime updates and premium gates.",
+  "navigation": {
+    "from": [
+      "AppHeader bell",
+      "notifications-read event"
+    ],
+    "to": [
+      "/likes",
+      "/chat/:id",
+      "/messages?tab=calls",
+      "openUpgrade overlay"
+    ]
+  },
+  "appBar": {
+    "title": "Notifications",
+    "actions": [
+      "back"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [
+    {
+      "id": "backBtn",
+      "type": "IconButton",
+      "icon": "ArrowLeft"
+    },
+    {
+      "id": "row",
+      "type": "Row",
+      "children": [
+        "TypedIcon",
+        "Title",
+        "Body",
+        "Timestamp",
+        "UnreadDot"
+      ]
+    },
+    {
+      "id": "upgradePrompt",
+      "type": "InlineCard",
+      "visibleWhen": "!isPremium && gatedTap",
+      "action": "openUpgrade"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [
+    {
+      "name": "notifications",
+      "item": "NotificationRow",
+      "pageSize": 30,
+      "loadMore": "sentinel infinite scroll"
+    }
+  ],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "notifications.select",
+      "endpoint": "rest/v1/notifications?user_id=eq.me&order=created_at.desc"
+    },
+    {
+      "name": "notifications.update is_read=true",
+      "endpoint": "rest/v1/notifications"
+    },
+    {
+      "name": "realtime insert",
+      "channel": "postgres_changes:notifications"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useAuth"
+    },
+    {
+      "hook": "useSubscription"
+    },
+    {
+      "hook": "useInfiniteScroll"
+    },
+    {
+      "hook": "usePullToRefresh"
+    }
+  ],
+  "validation": [],
+  "loadingState": {
+    "ui": "centered spinner"
+  },
+  "errorState": {},
+  "emptyState": {
+    "icon": "\ud83d\udd14",
+    "text": "No notifications yet"
+  },
+  "successState": {},
+  "assets": [],
+  "animations": [
+    "fade-in slide-in-from-top-1 on upgrade prompt"
+  ],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

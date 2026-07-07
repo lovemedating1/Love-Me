@@ -1,0 +1,213 @@
+{
+  "screenName": "AuthPage",
+  "route": "/auth",
+  "purpose": "Email/password sign-in and sign-up with Google OAuth, remember-me, password reset flow.",
+  "navigation": {
+    "from": [
+      "App launch (unauthenticated)",
+      "AuthGuard redirect",
+      "SignOut from any screen"
+    ],
+    "to": [
+      "/profile-setup (new user)",
+      "/ (existing user)",
+      "/reset-password (via email link)"
+    ]
+  },
+  "appBar": {
+    "title": "Love Me",
+    "actions": []
+  },
+  "layout": {
+    "type": "centeredCard",
+    "children": [
+      "Logo",
+      "Tabs(SignIn/SignUp)",
+      "Form",
+      "OAuthButtons",
+      "Footer(legal links)"
+    ]
+  },
+  "components": [
+    {
+      "id": "logo",
+      "type": "Image",
+      "image": "loveme-logo",
+      "position": "top-center",
+      "size": {
+        "w": 96,
+        "h": 96
+      }
+    },
+    {
+      "id": "tabTrigger",
+      "type": "Tabs",
+      "text": "Sign In | Sign Up"
+    },
+    {
+      "id": "emailInput",
+      "type": "Input",
+      "name": "email",
+      "text": "Email",
+      "action": "setEmail"
+    },
+    {
+      "id": "passwordInput",
+      "type": "Input",
+      "name": "password",
+      "text": "Password",
+      "action": "setPassword"
+    },
+    {
+      "id": "rememberMe",
+      "type": "Checkbox",
+      "name": "rememberMe",
+      "text": "Remember me"
+    },
+    {
+      "id": "forgotPwd",
+      "type": "Link",
+      "text": "Forgot password?",
+      "action": "openResetDialog"
+    },
+    {
+      "id": "submitBtn",
+      "type": "Button",
+      "text": "Sign In / Create Account",
+      "style": {
+        "backgroundColor": "#E6287A",
+        "textColor": "#FFF",
+        "borderRadius": "9999px",
+        "fontWeight": "700"
+      },
+      "action": "supabase.auth.signInWithPassword | signUp"
+    },
+    {
+      "id": "googleBtn",
+      "type": "Button",
+      "text": "Continue with Google",
+      "icon": "google",
+      "action": "supabase.auth.signInWithOAuth"
+    }
+  ],
+  "forms": [
+    {
+      "name": "signin",
+      "fields": [
+        "email",
+        "password",
+        "rememberMe"
+      ]
+    },
+    {
+      "name": "signup",
+      "fields": [
+        "email",
+        "password",
+        "confirmPassword",
+        "acceptTerms(18+)"
+      ]
+    }
+  ],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [
+    {
+      "id": "resetPassword",
+      "trigger": "forgotPwd",
+      "fields": [
+        "email"
+      ],
+      "api": "functions.invoke('request-password-reset')"
+    }
+  ],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "signInWithPassword",
+      "method": "POST",
+      "endpoint": "auth/v1/token?grant_type=password"
+    },
+    {
+      "name": "signUp",
+      "method": "POST",
+      "endpoint": "auth/v1/signup"
+    },
+    {
+      "name": "signInWithOAuth(google)",
+      "method": "GET",
+      "endpoint": "auth/v1/authorize"
+    },
+    {
+      "name": "request-password-reset",
+      "method": "POST",
+      "endpoint": "functions/v1/request-password-reset"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useAuth",
+      "provides": "user,session"
+    },
+    {
+      "local": "email,password,mode,loading,rememberMe"
+    }
+  ],
+  "validation": [
+    {
+      "field": "email",
+      "rule": "RFC email regex, required"
+    },
+    {
+      "field": "password",
+      "rule": "min 8 chars"
+    },
+    {
+      "field": "acceptTerms",
+      "rule": "must be true on signup (18+)"
+    }
+  ],
+  "loadingState": {
+    "trigger": "submit",
+    "ui": "spinner in button, disabled inputs"
+  },
+  "errorState": {
+    "source": "supabase error",
+    "ui": "toast (destructive) + inline red text"
+  },
+  "emptyState": {},
+  "successState": {
+    "ui": "toast + redirect"
+  },
+  "assets": [
+    "/loveme-logo.png",
+    "google icon (lucide)"
+  ],
+  "animations": [
+    "fade-in on mount"
+  ],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

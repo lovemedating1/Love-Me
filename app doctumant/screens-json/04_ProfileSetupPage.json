@@ -1,0 +1,191 @@
+{
+  "screenName": "ProfileSetupPage",
+  "route": "/profile-setup",
+  "purpose": "4-step onboarding wizard: basics, photos, preferences, location.",
+  "navigation": {
+    "from": [
+      "/auth (new user)",
+      "/email-verified"
+    ],
+    "to": [
+      "/ (Discover)"
+    ]
+  },
+  "appBar": {
+    "title": "Complete your profile",
+    "actions": []
+  },
+  "layout": {
+    "type": "stepper",
+    "children": [
+      "ProgressBar",
+      "StepContent",
+      "NextBackButtons"
+    ]
+  },
+  "components": [
+    {
+      "id": "progress",
+      "type": "Progress",
+      "style": {
+        "backgroundColor": "#E6287A"
+      }
+    },
+    {
+      "id": "nameInput",
+      "type": "Input",
+      "name": "displayName"
+    },
+    {
+      "id": "dob",
+      "type": "DatePicker",
+      "name": "dateOfBirth"
+    },
+    {
+      "id": "gender",
+      "type": "RadioGroup",
+      "name": "gender"
+    },
+    {
+      "id": "interestedIn",
+      "type": "RadioGroup",
+      "name": "interestedIn"
+    },
+    {
+      "id": "photoUpload",
+      "type": "PhotoUpload",
+      "name": "avatar",
+      "action": "moderate-image edge function"
+    },
+    {
+      "id": "galleryUpload",
+      "type": "PhotoUpload",
+      "name": "gallery[]"
+    },
+    {
+      "id": "country",
+      "type": "Select",
+      "name": "country"
+    },
+    {
+      "id": "city",
+      "type": "Input",
+      "name": "city"
+    },
+    {
+      "id": "geolocate",
+      "type": "Button",
+      "text": "Use current location",
+      "action": "navigator.geolocation"
+    },
+    {
+      "id": "nextBtn",
+      "type": "Button",
+      "text": "Next / Finish",
+      "action": "advance step / submit"
+    }
+  ],
+  "forms": [
+    {
+      "name": "step1",
+      "fields": [
+        "displayName",
+        "dob",
+        "gender",
+        "interestedIn"
+      ]
+    },
+    {
+      "name": "step2",
+      "fields": [
+        "avatar",
+        "gallery"
+      ]
+    },
+    {
+      "name": "step3",
+      "fields": [
+        "bio",
+        "interests"
+      ]
+    },
+    {
+      "name": "step4",
+      "fields": [
+        "country",
+        "city",
+        "coords"
+      ]
+    }
+  ],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "profiles.upsert",
+      "method": "POST",
+      "endpoint": "rest/v1/profiles"
+    },
+    {
+      "name": "storage.upload(avatars)",
+      "endpoint": "storage/v1/object/avatars"
+    },
+    {
+      "name": "moderate-image",
+      "endpoint": "functions/v1/moderate-image"
+    }
+  ],
+  "stateManagement": [],
+  "validation": [
+    {
+      "field": "dob",
+      "rule": "age >= 18"
+    },
+    {
+      "field": "displayName",
+      "rule": "1-30 chars"
+    },
+    {
+      "field": "avatar",
+      "rule": "required, must pass NSFW moderation"
+    }
+  ],
+  "loadingState": {
+    "ui": "step-level spinner"
+  },
+  "errorState": {
+    "ui": "toast + inline"
+  },
+  "emptyState": {},
+  "successState": {
+    "ui": "navigate to /"
+  },
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "screenName": "IndexShell",
+  "route": "/",
+  "purpose": "Authenticated shell wrapping tabbed pages: header, main outlet, bottom nav, global overlays (trial, verification, suspension, location).",
+  "navigation": {
+    "from": [
+      "/auth"
+    ],
+    "to": [
+      "/ (Discover)",
+      "/likes",
+      "/messages",
+      "/explore",
+      "/profile",
+      "/notifications",
+      "/settings",
+      "/subscription"
+    ]
+  },
+  "appBar": {
+    "title": "Dynamic per tab (AppHeader)",
+    "actions": [
+      "notifications bell",
+      "search"
+    ]
+  },
+  "layout": {
+    "type": "flexColumn",
+    "children": [
+      "AppHeader",
+      "Main<Outlet/>",
+      "BottomNav",
+      "Overlays"
+    ]
+  },
+  "components": [
+    {
+      "id": "appHeader",
+      "type": "AppHeader",
+      "style": {
+        "backgroundColor": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+      }
+    },
+    {
+      "id": "bottomNav",
+      "type": "BottomNav",
+      "children": [
+        "Discover",
+        "Likes",
+        "Messages",
+        "Explore",
+        "Profile"
+      ]
+    },
+    {
+      "id": "trialBanner",
+      "type": "Dialog",
+      "visibleWhen": "!isPremium && trialDaysLeft>0"
+    },
+    {
+      "id": "locationPrompt",
+      "type": "Dialog",
+      "visibleWhen": "!locationEnabled"
+    },
+    {
+      "id": "verificationGate",
+      "type": "Overlay",
+      "visibleWhen": "!verified"
+    },
+    {
+      "id": "suspensionGate",
+      "type": "Overlay",
+      "visibleWhen": "suspended"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "presence upsert",
+      "endpoint": "rest/v1/user_presence"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "usePresence"
+    },
+    {
+      "hook": "useSubscription"
+    },
+    {
+      "hook": "useLocation"
+    }
+  ],
+  "validation": [],
+  "loadingState": {},
+  "errorState": {},
+  "emptyState": {},
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

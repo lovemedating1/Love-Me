@@ -1,0 +1,85 @@
+{
+  "screenName": "SafetyReportsPage",
+  "route": "/safety-reports",
+  "purpose": "User's submitted safety reports with statuses.",
+  "navigation": {
+    "from": [
+      "/settings"
+    ],
+    "to": [
+      "back"
+    ]
+  },
+  "appBar": {
+    "title": "My Reports",
+    "actions": [
+      "back"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [
+    {
+      "id": "reportRow",
+      "type": "Card",
+      "children": [
+        "type",
+        "status",
+        "createdAt",
+        "adminResponse"
+      ]
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [
+    {
+      "name": "reports",
+      "item": "ReportRow"
+    }
+  ],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "safety_reports.select",
+      "endpoint": "rest/v1/safety_reports?reporter_id=eq.me"
+    }
+  ],
+  "stateManagement": [],
+  "validation": [],
+  "loadingState": {},
+  "errorState": {},
+  "emptyState": {
+    "text": "No reports submitted"
+  },
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

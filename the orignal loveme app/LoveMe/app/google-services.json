@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "853192798276",
+    "project_id": "loveme-international-dat-1fd76",
+    "storage_bucket": "loveme-international-dat-1fd76.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:853192798276:android:ab00d6a389c4fc1ca90c11",
+        "android_client_info": {
+          "package_name": "com.loveme.intldating"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJZ2uy8TtOz9HRh2Y3HhBGN7fnjjnYnsc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

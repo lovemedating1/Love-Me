@@ -1,0 +1,102 @@
+{
+  "screenName": "AdminDiagnosticsPage",
+  "route": "/admin/diagnostics",
+  "purpose": "Admin-only diagnostics: payment logs, edge function health, telemetry.",
+  "navigation": {
+    "from": [
+      "direct URL (admin role)"
+    ],
+    "to": [
+      "back"
+    ]
+  },
+  "appBar": {
+    "title": "Admin Diagnostics",
+    "actions": [
+      "back"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [],
+  "forms": [],
+  "buttons": [],
+  "lists": [
+    {
+      "name": "logs",
+      "item": "LogRow"
+    }
+  ],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [
+    {
+      "name": "Payments"
+    },
+    {
+      "name": "GPS"
+    },
+    {
+      "name": "Push"
+    },
+    {
+      "name": "Emails"
+    }
+  ],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "payment_logs.select",
+      "endpoint": "rest/v1/payment_logs"
+    },
+    {
+      "name": "gps_telemetry.select",
+      "endpoint": "rest/v1/gps_telemetry"
+    },
+    {
+      "name": "has_role check",
+      "endpoint": "rest/v1/rpc/has_role"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useAuth"
+    },
+    {
+      "guard": "requires admin role via has_role RPC"
+    }
+  ],
+  "validation": [],
+  "loadingState": {},
+  "errorState": {
+    "ui": "403 if not admin"
+  },
+  "emptyState": {},
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

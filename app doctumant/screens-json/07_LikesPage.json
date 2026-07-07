@@ -1,0 +1,120 @@
+{
+  "screenName": "LikesPage",
+  "route": "/likes",
+  "purpose": "Grid of users who liked me (blurred for free tier) and mutual matches.",
+  "navigation": {
+    "from": [
+      "BottomNav Likes tab",
+      "Notification tap"
+    ],
+    "to": [
+      "/chat/:id",
+      "/subscription"
+    ]
+  },
+  "appBar": {
+    "title": "Likes",
+    "actions": []
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [
+    {
+      "id": "likeCard",
+      "type": "Card",
+      "style": {
+        "borderRadius": "16px"
+      }
+    },
+    {
+      "id": "avatar",
+      "type": "Image",
+      "style": {
+        "blur": "!isPremium ? 20px : 0"
+      }
+    },
+    {
+      "id": "upgradeCta",
+      "type": "Button",
+      "text": "Unlock with Premium",
+      "visibleWhen": "!isPremium",
+      "action": "openUpgrade"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [
+    {
+      "name": "likesGrid",
+      "columns": 2,
+      "item": "LikeCard"
+    }
+  ],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [
+    {
+      "name": "Liked You",
+      "count": "n"
+    },
+    {
+      "name": "Matches",
+      "count": "m"
+    }
+  ],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "likes.select (incoming)",
+      "endpoint": "rest/v1/likes?target_user_id=eq.me"
+    },
+    {
+      "name": "matches.select",
+      "endpoint": "rest/v1/matches"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useSubscription"
+    },
+    {
+      "hook": "useAuth"
+    }
+  ],
+  "validation": [],
+  "loadingState": {
+    "ui": "grid skeleton"
+  },
+  "errorState": {},
+  "emptyState": {
+    "icon": "\ud83d\udc95",
+    "text": "No likes yet \u2014 keep swiping!"
+  },
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

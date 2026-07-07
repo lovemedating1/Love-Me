@@ -1,0 +1,225 @@
+{
+  "screenName": "ChatPage",
+  "route": "/chat/:partnerId",
+  "purpose": "1:1 realtime chat with text, images, voice notes, reactions, WebRTC audio/video calls.",
+  "navigation": {
+    "from": [
+      "/messages",
+      "/likes",
+      "/discover match",
+      "notification tap"
+    ],
+    "to": [
+      "/messages (back)",
+      "CallScreen (call)"
+    ]
+  },
+  "appBar": {
+    "title": "{partner.displayName}",
+    "actions": [
+      "voiceCall",
+      "videoCall",
+      "block/report menu"
+    ]
+  },
+  "layout": {
+    "type": "chatColumn",
+    "children": [
+      "Header",
+      "MessagesScroll",
+      "TypingIndicator",
+      "InputBar"
+    ]
+  },
+  "components": [
+    {
+      "id": "partnerHeader",
+      "type": "Row",
+      "children": [
+        "Avatar",
+        "Name",
+        "OnlineStatus"
+      ]
+    },
+    {
+      "id": "voiceCallBtn",
+      "type": "IconButton",
+      "icon": "Phone",
+      "action": "startCall(audio)"
+    },
+    {
+      "id": "videoCallBtn",
+      "type": "IconButton",
+      "icon": "Video",
+      "action": "startCall(video)"
+    },
+    {
+      "id": "menuBtn",
+      "type": "IconButton",
+      "icon": "MoreVertical",
+      "action": "openBlockReport"
+    },
+    {
+      "id": "messageBubble",
+      "type": "Bubble",
+      "style": {
+        "borderRadius": "16px",
+        "backgroundColor": "sent:#E6287A / received:#F1F5F9"
+      }
+    },
+    {
+      "id": "reactionBar",
+      "type": "EmojiReactionBar"
+    },
+    {
+      "id": "voicePlayer",
+      "type": "VoiceMessagePlayer"
+    },
+    {
+      "id": "imageMsg",
+      "type": "Image",
+      "action": "openChatImageViewer"
+    },
+    {
+      "id": "textInput",
+      "type": "Textarea",
+      "name": "message",
+      "action": "sendMessage"
+    },
+    {
+      "id": "emojiBtn",
+      "type": "IconButton",
+      "icon": "Smile",
+      "action": "openEmojiPicker"
+    },
+    {
+      "id": "attachBtn",
+      "type": "IconButton",
+      "icon": "Paperclip",
+      "action": "pickImage"
+    },
+    {
+      "id": "micBtn",
+      "type": "IconButton",
+      "icon": "Mic",
+      "action": "recordVoice (hold)"
+    },
+    {
+      "id": "sendBtn",
+      "type": "IconButton",
+      "icon": "Send",
+      "action": "insertMessage"
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [],
+  "cards": [],
+  "dialogs": [
+    {
+      "id": "block",
+      "component": "BlockReportDialog"
+    },
+    {
+      "id": "imageViewer",
+      "component": "ChatImageViewer"
+    },
+    {
+      "id": "callPermission",
+      "component": "CallPermissionDialog"
+    }
+  ],
+  "bottomSheets": [
+    {
+      "id": "emojiPicker",
+      "component": "EmojiPicker"
+    }
+  ],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "messages.select",
+      "endpoint": "rest/v1/messages?conversation_id=..."
+    },
+    {
+      "name": "messages.insert",
+      "endpoint": "rest/v1/messages"
+    },
+    {
+      "name": "messages realtime",
+      "channel": "postgres_changes:messages filter partner"
+    },
+    {
+      "name": "message_reactions",
+      "endpoint": "rest/v1/message_reactions"
+    },
+    {
+      "name": "storage.upload(chat-media / voice-messages)"
+    },
+    {
+      "name": "moderate-image",
+      "endpoint": "functions/v1/moderate-image"
+    },
+    {
+      "name": "typing broadcast",
+      "channel": "broadcast:typing"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useAuth"
+    },
+    {
+      "hook": "useMessageReactions"
+    },
+    {
+      "hook": "useVoiceRecorder"
+    },
+    {
+      "context": "CallContext"
+    }
+  ],
+  "validation": [
+    {
+      "field": "message",
+      "rule": "chatModeration.filterProfanity, max 2000 chars"
+    }
+  ],
+  "loadingState": {
+    "ui": "top spinner on history load"
+  },
+  "errorState": {
+    "ui": "retry send"
+  },
+  "emptyState": {
+    "text": "Say hi \ud83d\udc4b"
+  },
+  "successState": {},
+  "assets": [],
+  "animations": [
+    "message slide-in",
+    "typing dots"
+  ],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

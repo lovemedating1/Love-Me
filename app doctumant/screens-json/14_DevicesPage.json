@@ -1,0 +1,99 @@
+{
+  "screenName": "DevicesPage",
+  "route": "/devices",
+  "purpose": "List of active signed-in devices with ability to revoke sessions.",
+  "navigation": {
+    "from": [
+      "/settings"
+    ],
+    "to": [
+      "/auth (after signOut all)"
+    ]
+  },
+  "appBar": {
+    "title": "Devices",
+    "actions": [
+      "back"
+    ]
+  },
+  "layout": {
+    "type": "column",
+    "children": []
+  },
+  "components": [
+    {
+      "id": "deviceRow",
+      "type": "Row",
+      "children": [
+        "DeviceIcon",
+        "DeviceName",
+        "LastActive",
+        "RevokeBtn"
+      ]
+    },
+    {
+      "id": "signOutAllBtn",
+      "type": "Button",
+      "text": "Sign out all",
+      "style": {
+        "backgroundColor": "#EF4444"
+      }
+    }
+  ],
+  "forms": [],
+  "buttons": [],
+  "lists": [
+    {
+      "name": "devices",
+      "item": "DeviceRow"
+    }
+  ],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "user_devices.select",
+      "endpoint": "rest/v1/user_devices"
+    },
+    {
+      "name": "user_devices.delete",
+      "endpoint": "rest/v1/user_devices?id=eq.X"
+    }
+  ],
+  "stateManagement": [
+    {
+      "hook": "useSingleDeviceSession"
+    }
+  ],
+  "validation": [],
+  "loadingState": {},
+  "errorState": {},
+  "emptyState": {},
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}

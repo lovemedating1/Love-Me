@@ -1,0 +1,94 @@
+{
+  "screenName": "ExplorePage",
+  "route": "/explore",
+  "purpose": "Country-based global discovery grid, browse users from any country.",
+  "navigation": {
+    "from": [
+      "BottomNav Explore tab"
+    ],
+    "to": [
+      "Profile detail dialog",
+      "/chat/:id (premium)"
+    ]
+  },
+  "appBar": {
+    "title": "Explore",
+    "actions": [
+      "country selector"
+    ]
+  },
+  "layout": {
+    "type": "grid",
+    "children": [
+      "CountrySelect",
+      "UserGrid"
+    ]
+  },
+  "components": [],
+  "forms": [],
+  "buttons": [],
+  "lists": [
+    {
+      "name": "usersGrid",
+      "columns": 2,
+      "item": "ProfileTile"
+    }
+  ],
+  "cards": [],
+  "dialogs": [],
+  "bottomSheets": [],
+  "tabs": [],
+  "filters": [
+    {
+      "name": "country",
+      "type": "Select"
+    },
+    {
+      "name": "gender",
+      "type": "Select"
+    }
+  ],
+  "search": {},
+  "apiCalls": [
+    {
+      "name": "profiles.select by country",
+      "endpoint": "rest/v1/profiles?country=eq.X"
+    }
+  ],
+  "stateManagement": [
+    {
+      "local": "country,gender,profiles,loading"
+    }
+  ],
+  "validation": [],
+  "loadingState": {
+    "ui": "grid skeleton"
+  },
+  "errorState": {},
+  "emptyState": {
+    "text": "No users in this country yet"
+  },
+  "successState": {},
+  "assets": [],
+  "animations": [],
+  "responsiveRules": {
+    "maxWidth": "448px (max-w-md)",
+    "safeArea": "env(safe-area-inset-top/bottom)",
+    "mobileFirst": true
+  },
+  "designTokens": {
+    "colors": {
+      "primary": "#E6287A",
+      "primaryForeground": "#FFFFFF",
+      "accent": "#FFB800",
+      "background": "#FFFFFF",
+      "foreground": "#0F172A",
+      "muted": "#F1F5F9",
+      "mutedForeground": "#64748B",
+      "border": "#E2E8F0",
+      "destructive": "#EF4444",
+      "gradientHeader": "linear-gradient(135deg,#E6287A,#FF6BAA)"
+    },
+    "font": "Roboto"
+  }
+}
