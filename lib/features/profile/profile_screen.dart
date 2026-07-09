@@ -4,14 +4,21 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/constants/route_paths.dart';
+import '../../core/media/photo_picker_service.dart';
+import '../../core/media/photo_source_sheet.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
-import '../../shared/data/mock_data.dart';
+import '../../core/utils/validators.dart';
 import '../../shared/data/repositories.dart';
 import '../../shared/models/profile.dart';
+import '../../shared/models/profile_photo.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/state_views.dart';
 import '../auth/auth_controller.dart';
+
+/// Gallery is capped at 4 photos total — the hard `display_order` (1-4)
+/// constraint on `profile_photos`, not the front-end AppConstants figure.
+const _maxProfilePhotos = 4;
 
 /// 10 — ProfilePage (tab body). Own profile summary + entry to settings,
 /// subscription, safety, sign out.
@@ -35,14 +42,14 @@ class ProfileScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     return ListView(
       children: [
-        _banner(context, p, isPremium),
+        _banner(context, ref, p, isPremium),
         const SizedBox(height: 12),
-        _statsRow(theme),
+        _statsRow(theme, ref),
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: OutlinedButton.icon(
-            onPressed: () => _editSheet(context, p),
+            onPressed: () => _editSheet(context, ref, p),
             icon: const Icon(LucideIcons.pencil),
             label: const Text('Edit Profile'),
           ),
@@ -58,7 +65,7 @@ class ProfileScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Text(p.bio!, style: theme.textTheme.bodyMedium),
           ),
-        if (p.gallery.isNotEmpty) _gallery(p),
+        _gallerySection(context, ref),
         const Divider(height: 24),
         // Demo toggle so the free/premium gates are testable without a backend.
         SwitchListTile(
@@ -95,7 +102,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _banner(BuildContext context, Profile p, bool isPremium) {
+  Widget _banner(
+      BuildContext context, WidgetRef ref, Profile p, bool isPremium) {
     final theme = Theme.of(context);
     return Container(
       decoration: const BoxDecoration(gradient: AppGradients.header),
@@ -108,10 +116,14 @@ class ProfileScreen extends ConsumerWidget {
               Positioned(
                 right: 0,
                 bottom: 0,
-                child: CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Colors.white,
-                  child: Icon(LucideIcons.camera, size: 14, color: AppColors.pink),
+                child: GestureDetector(
+                  onTap: () => _changeAvatar(context, ref),
+                  child: const CircleAvatar(
+                    radius: 14,
+                    backgroundColor: Colors.white,
+                    child: Icon(LucideIcons.camera,
+                        size: 14, color: AppColors.pink),
+                  ),
                 ),
               ),
             ],
@@ -144,21 +156,28 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _statsRow(ThemeData theme) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            _stat(theme, 'Views', MockData.viewsCount),
-            _stat(theme, 'Likes', MockData.likesCount),
-            _stat(theme, 'Matches', MockData.matchesCount),
-          ],
-        ),
-      );
+  /// Live counts from `likes` / `matches`. **Views shows "–"**: the
+  /// `profile_views` RLS only exposes views *you made*, not views *of you*,
+  /// so "who viewed me" is not obtainable until a premium RPC exists
+  /// (migration_002.md §5). Showing a dash beats inventing a number.
+  Widget _statsRow(ThemeData theme, WidgetRef ref) {
+    final stats = ref.watch(myStatsProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          _stat(theme, 'Views', null),
+          _stat(theme, 'Likes', stats.valueOrNull?.likes),
+          _stat(theme, 'Matches', stats.valueOrNull?.matches),
+        ],
+      ),
+    );
+  }
 
-  Widget _stat(ThemeData theme, String label, int value) => Expanded(
+  Widget _stat(ThemeData theme, String label, int? value) => Expanded(
         child: Column(
           children: [
-            Text('$value', style: theme.textTheme.titleLarge),
+            Text(value?.toString() ?? '–', style: theme.textTheme.titleLarge),
             Text(label, style: theme.textTheme.bodySmall),
           ],
         ),
@@ -187,23 +206,200 @@ class ProfileScreen extends ConsumerWidget {
         ),
       );
 
-  Widget _gallery(Profile p) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          children: [
-            for (final _ in p.gallery)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(color: const Color(0x22E6287A)),
+  Widget _gallerySection(BuildContext context, WidgetRef ref) {
+    final photos = ref.watch(myPhotosProvider);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: photos.when(
+        loading: () => const SizedBox(
+            height: 80, child: Center(child: CircularProgressIndicator())),
+        error: (_, _) => ErrorView(
+            message: 'Could not load photos.',
+            onRetry: () => ref.invalidate(myPhotosProvider)),
+        data: (list) => _gallery(context, ref, list),
+      ),
+    );
+  }
+
+  Widget _gallery(BuildContext context, WidgetRef ref, List<ProfilePhoto> photos) {
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      children: [
+        for (final photo in photos)
+          GestureDetector(
+            onTap: photo.isPrimary ? null : () => _setPrimary(context, ref, photo),
+            onLongPress: () => _deletePhoto(context, ref, photo),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(photo.photoUrl, fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          Container(color: const Color(0x22E6287A))),
+                  if (photo.isPrimary)
+                    const Positioned(
+                      top: 4,
+                      left: 4,
+                      child: Icon(LucideIcons.star,
+                          color: AppColors.gold, size: 16),
+                    ),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        if (photos.length < _maxProfilePhotos)
+          GestureDetector(
+            onTap: () => _addPhoto(context, ref, photos),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: const Icon(LucideIcons.plus),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Lets the user take/choose a photo, validates on-device that it contains
+  /// a face (rejecting non-person photos), uploads it to the `avatars` bucket,
+  /// and inserts a `profile_photos` row at the next free slot.
+  Future<void> _addPhoto(
+      BuildContext context, WidgetRef ref, List<ProfilePhoto> existing) async {
+    final source = await showPhotoSourceSheet(context);
+    if (source == null) return;
+
+    final usedSlots = existing.map((p) => p.displayOrder).toSet();
+    final freeSlot = [1, 2, 3, 4].firstWhere((s) => !usedSlots.contains(s));
+    try {
+      final picker = ref.read(photoPickerServiceProvider);
+      final picked = await picker.pickProfilePhoto(source);
+
+      final repo = ref.read(profilePhotoRepositoryProvider);
+      final url = await repo.uploadPhoto(picked.bytes,
+          fileExtension: picked.fileExtension);
+      await repo.addPhoto(
+        photoUrl: url,
+        displayOrder: freeSlot,
+        isPrimary: existing.isEmpty,
       );
+      ref.invalidate(myPhotosProvider);
+      if (existing.isEmpty) ref.invalidate(currentUserProvider);
+    } on PhotoPickCancelled {
+      // User backed out — no-op.
+    } on NoFaceDetectedException {
+      if (context.mounted) {
+        _toast(
+            context,
+            'That doesn\'t look like a photo of a person. Please upload a '
+            'clear photo of yourself.',
+            error: true);
+      }
+    } on ProfilePhotoSlotTakenException {
+      if (context.mounted) _toast(context, 'That slot is taken — try again.', error: true);
+    } on MediaUploadException catch (e) {
+      if (context.mounted) _toast(context, e.message, error: true);
+    } catch (e) {
+      if (context.mounted) _toast(context, 'Could not add photo: $e', error: true);
+    }
+  }
+
+  Future<void> _setPrimary(
+      BuildContext context, WidgetRef ref, ProfilePhoto photo) async {
+    try {
+      await ref.read(profilePhotoRepositoryProvider).setPrimary(photo.id);
+      ref.invalidate(myPhotosProvider);
+      ref.invalidate(currentUserProvider);
+    } catch (_) {
+      if (context.mounted) {
+        _toast(context, 'Could not set primary photo — try again.', error: true);
+      }
+    }
+  }
+
+  /// Avatar camera badge — pick a new photo (face-validated), upload it, and
+  /// make it the primary. If the gallery is already full (4), the current
+  /// primary is replaced; otherwise the new photo is added at a free slot.
+  Future<void> _changeAvatar(BuildContext context, WidgetRef ref) async {
+    final source = await showPhotoSourceSheet(context);
+    if (source == null) return;
+
+    try {
+      final picker = ref.read(photoPickerServiceProvider);
+      final picked = await picker.pickProfilePhoto(source);
+
+      final repo = ref.read(profilePhotoRepositoryProvider);
+      final photos = await repo.myPhotos();
+      final usedSlots = photos.map((p) => p.displayOrder).toSet();
+      final freeSlot =
+          [1, 2, 3, 4].where((s) => !usedSlots.contains(s)).firstOrNull;
+
+      // Gallery full → free the current primary's slot first.
+      var slot = freeSlot;
+      if (slot == null) {
+        final primary = photos.where((p) => p.isPrimary).firstOrNull ??
+            (photos.isNotEmpty ? photos.first : null);
+        if (primary != null) {
+          await repo.deletePhoto(primary.id);
+          slot = primary.displayOrder;
+        } else {
+          slot = 1;
+        }
+      }
+
+      final url = await repo.uploadPhoto(picked.bytes,
+          fileExtension: picked.fileExtension);
+      await repo.addPhoto(photoUrl: url, displayOrder: slot, isPrimary: true);
+
+      ref.invalidate(myPhotosProvider);
+      ref.invalidate(currentUserProvider);
+    } on PhotoPickCancelled {
+      // User backed out — no-op.
+    } on NoFaceDetectedException {
+      if (context.mounted) {
+        _toast(
+            context,
+            'That doesn\'t look like a photo of a person. Please upload a '
+            'clear photo of yourself.',
+            error: true);
+      }
+    } on MediaUploadException catch (e) {
+      if (context.mounted) _toast(context, e.message, error: true);
+    } catch (e) {
+      if (context.mounted) {
+        _toast(context, 'Could not update photo: $e', error: true);
+      }
+    }
+  }
+
+  Future<void> _deletePhoto(
+      BuildContext context, WidgetRef ref, ProfilePhoto photo) async {
+    try {
+      await ref.read(profilePhotoRepositoryProvider).deletePhoto(photo.id);
+      ref.invalidate(myPhotosProvider);
+      if (photo.isPrimary) ref.invalidate(currentUserProvider);
+    } catch (_) {
+      if (context.mounted) {
+        _toast(context, 'Could not delete photo — try again.', error: true);
+      }
+    }
+  }
+
+  void _toast(BuildContext context, String msg, {bool error = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(msg),
+        backgroundColor: error ? AppColors.destructive : AppColors.pink,
+        behavior: SnackBarBehavior.floating,
+      ));
+  }
 
   Widget _row(BuildContext context, IconData icon, String label, String route) =>
       ListTile(
@@ -213,41 +409,102 @@ class ProfileScreen extends ConsumerWidget {
         onTap: () => context.push(route),
       );
 
-  void _editSheet(BuildContext context, Profile p) {
+  void _editSheet(BuildContext context, WidgetRef ref, Profile p) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 8,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Edit Profile', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            TextField(
-              controller: TextEditingController(text: p.name),
-              decoration: const InputDecoration(labelText: 'Name'),
+      builder: (_) => _EditProfileSheet(profile: p),
+    );
+  }
+}
+
+/// Edit Profile — persists `name` to the live `profiles` row.
+///
+/// `bio` is deliberately absent: there is **no `bio` column** in the live
+/// schema (it's a local-only field on [Profile]). It was previously rendered
+/// with a throwaway controller and a Save button that saved nothing; showing
+/// nothing is more honest than a field that silently discards input. Restore
+/// it once the column ships (BACKEND_REMAINING.md [BE-13]).
+class _EditProfileSheet extends ConsumerStatefulWidget {
+  const _EditProfileSheet({required this.profile});
+
+  final Profile profile;
+
+  @override
+  ConsumerState<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
+  late final _name = TextEditingController(text: widget.profile.name);
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    final invalid = Validators.displayName(name);
+    if (invalid != null) {
+      setState(() => _error = invalid);
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(profileRepositoryProvider).updateMyProfile(name: name);
+      ref.invalidate(currentUserProvider);
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not save — try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 8,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Edit Profile', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _name,
+            enabled: !_saving,
+            decoration: InputDecoration(
+              labelText: 'Name',
+              errorText: _error,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: TextEditingController(text: p.bio),
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Bio'),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Text('Save'),
+          ),
+        ],
       ),
     );
   }

@@ -1,4 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Camera is used for "Take Photo" (profile + chat) and video capture.
+         image_picker's gallery path uses the Android Photo Picker and needs
+         no storage permission on modern Android. RECORD_AUDIO is for chat
+         voice messages. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+
     <application
         android:label="love_me"
         android:name="${applicationName}"
@@ -30,6 +39,12 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Pre-download the ML Kit face-detection model on install so the
+             first profile-photo validation doesn't stall waiting for it. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="face" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

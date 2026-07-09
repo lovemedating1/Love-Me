@@ -6,6 +6,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/constants/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_mode_controller.dart';
+import '../../shared/data/repositories.dart';
+import '../../shared/models/notification_preferences.dart';
 import '../auth/auth_controller.dart';
 
 /// 13 — SettingsPage. Sectioned preferences: discovery, notifications, privacy,
@@ -21,10 +23,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   RangeValues _age = const RangeValues(18, 45);
   double _distance = 50;
   String _showMe = 'everyone';
-  bool _push = true;
-  bool _email = false;
-  bool _sound = true;
-  bool _vibrate = true;
+  // Notification prefs come from the live `notification_preferences` row —
+  // see _notificationPrefs(). (Sound/Vibration had no backing column and were
+  // removed rather than kept as fake toggles.)
+  bool _savingPrefs = false;
   bool _hideDistance = false;
   bool _onlineStatus = true;
   bool _screenshotGuard = true;
@@ -93,10 +95,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           _section('Notifications'),
-          _switch('Push notifications', _push, (v) => setState(() => _push = v)),
-          _switch('Email notifications', _email, (v) => setState(() => _email = v)),
-          _switch('Sound', _sound, (v) => setState(() => _sound = v)),
-          _switch('Vibration', _vibrate, (v) => setState(() => _vibrate = v)),
+          _notificationPrefs(),
 
           _section('Privacy'),
           _switch('Hide my distance', _hideDistance,
@@ -162,6 +161,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         value: value,
         onChanged: onChanged,
       );
+
+  /// The live `notification_preferences` row — 8 real toggles. Each change
+  /// PATCHes the row immediately; on failure we refetch so the UI can't drift
+  /// from the server.
+  Widget _notificationPrefs() {
+    final prefs = ref.watch(notificationPreferencesProvider);
+    return prefs.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => ListTile(
+        leading: const Icon(LucideIcons.triangleAlert, color: AppColors.destructive),
+        title: const Text('Could not load notification settings'),
+        trailing: TextButton(
+          onPressed: () => ref.invalidate(notificationPreferencesProvider),
+          child: const Text('Retry'),
+        ),
+      ),
+      data: (p) => Column(
+        children: [
+          _prefSwitch('Push notifications', p.pushEnabled,
+              (v) => _savePrefs(p.copyWith(pushEnabled: v))),
+          _prefSwitch('Email notifications', p.emailEnabled,
+              (v) => _savePrefs(p.copyWith(emailEnabled: v))),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          _prefSwitch('Likes', p.likeNotifications,
+              (v) => _savePrefs(p.copyWith(likeNotifications: v))),
+          _prefSwitch('Matches', p.matchNotifications,
+              (v) => _savePrefs(p.copyWith(matchNotifications: v))),
+          _prefSwitch('Messages', p.messageNotifications,
+              (v) => _savePrefs(p.copyWith(messageNotifications: v))),
+          _prefSwitch('Calls', p.callNotifications,
+              (v) => _savePrefs(p.copyWith(callNotifications: v))),
+          _prefSwitch('Profile views', p.profileViewNotifications,
+              (v) => _savePrefs(p.copyWith(profileViewNotifications: v))),
+          _prefSwitch('Promotions & updates', p.marketingNotifications,
+              (v) => _savePrefs(p.copyWith(marketingNotifications: v))),
+        ],
+      ),
+    );
+  }
+
+  Widget _prefSwitch(String label, bool value, ValueChanged<bool> onChanged) =>
+      SwitchListTile(
+        title: Text(label),
+        value: value,
+        onChanged: _savingPrefs ? null : onChanged,
+      );
+
+  Future<void> _savePrefs(NotificationPreferences next) async {
+    setState(() => _savingPrefs = true);
+    try {
+      await ref.read(notificationRepositoryProvider).updatePreferences(next);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(
+            content: Text('Could not save notification settings.'),
+            behavior: SnackBarBehavior.floating,
+          ));
+      }
+    } finally {
+      // Refetch either way so the switches reflect the server, not our guess.
+      ref.invalidate(notificationPreferencesProvider);
+      if (mounted) setState(() => _savingPrefs = false);
+    }
+  }
 
   Widget _nav(IconData icon, String label, String route) => ListTile(
         leading: Icon(icon),

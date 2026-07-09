@@ -156,9 +156,151 @@ the table is read/update-only from the client (unmatch/block).
 - Deferred: `profile_views`/`recordView()` (no quota UI consumes it yet);
   unmatch/block have no UI entry point yet (repository methods exist, unused).
 
-The next slice is **messages** (once that migration lands), or wiring
-unmatch/block into the Matches tab UI. Reconcile plan names before touching
-Subscription.
+**BACKEND INTEGRATION — Chat & Calls module (built, 2026-07-08).** Wired against
+`005_chat.sql` + `006_chat_rls.sql` from `app doctumant/migration_003.md`:
+`conversations`, `messages`, `message_reads`, `message_reactions`, `call_logs`.
+**Chat is blocked for brand-new matches**: `conversations` has no INSERT policy
+and no trigger yet auto-creates one when a match forms — the client can only
+use a conversation backend has already inserted out-of-band. The Chat screen
+shows an explicit "not available yet" empty state instead of erroring.
+- `shared/models/conversation.dart` + `message.dart` (REWRITTEN) to mirror the
+  live schema exactly (was a flat partnerId-keyed mock shape before). Added
+  `message_read.dart`, `message_reaction.dart`, `call_log.dart` (NEW).
+- `shared/data/chat_repository.dart` (NEW) — `SupabaseChatRepository`:
+  message history/send/edit/soft-delete/markAsRead/reactions +
+  `subscribeToMessages()` (realtime). Maps Postgres `23514` (message-shape
+  constraint violation) to a typed `MessageConstraintException`.
+- `shared/data/call_repository.dart` (NEW) — `SupabaseCallRepository`:
+  start/updateStatus/end (`ended_at`+`ended_by` always sent together per the
+  DB constraint)/history against `call_logs`. Wired but no screen calls it yet
+  — no calling UI/WebRTC in this pass.
+- `shared/data/conversation_repository.dart` (NEW) — `SupabaseConversationRepository`:
+  joins active matches → conversations → the other participant's profile, and
+  previews the latest message by querying `messages` directly (
+  `conversations.last_message_id`/`last_message_at` aren't populated
+  server-side yet). `forPartner(userId)` returns `null` when no conversation
+  exists — the seam the Chat screen uses to detect "not available yet".
+- `shared/data/repositories.dart`: old mock `ConversationRepository`/
+  `MessageRepository` interfaces dropped entirely (shape changed too much to
+  adapt at the boundary); `conversationsProvider` now returns
+  `List<ConversationSummary>`; `messagesProvider` re-keyed from `partnerId` to
+  `conversationId`.
+- `features/messages/messages_screen.dart` + `features/chat/chat_screen.dart`
+  rewritten for the live schema; Discover/Explore/Likes/Notifications chat
+  call sites untouched — they still just `context.push(RoutePaths.chatTo(userId))`
+  and the Chat screen itself resolves/handles the missing-conversation case.
+- Verified: `flutter analyze` clean, `flutter test` green (2, unchanged). Not
+  run on-device — needs backend to manually insert a `conversations` row for
+  a real match to test end-to-end.
+- Deferred: conversation auto-create trigger (the hard blocker), last-message
+  populate trigger, media storage buckets, location coordinates, call UX/WebRTC,
+  "seen by" read-receipt UI beyond the sender's own single/double-check.
+
+**BACKEND INTEGRATION — Notifications module (built, 2026-07-08).** Wired
+against `notifications` + `notification_preferences` from
+`app doctumant/migration_004.md`. **`notification_queue` is off-limits to
+Flutter entirely** — service-role/Edge Function only, never queried. Backend
+status per the doc: schema + RLS complete; push dispatch/Edge Functions/
+Firebase delivery/realtime are **not built yet**.
+- `shared/models/app_notification.dart` (REWRITTEN) — real 11-value
+  `NotificationType` enum (was a 7-value mock enum), `actorUserId` +
+  `data` (jsonb) for deep-linking, replacing the old `relatedUserId` shortcut.
+- `shared/models/notification_preferences.dart` (NEW) — mirrors the live
+  8-column preferences row.
+- `shared/data/notification_repository.dart` (NEW) — `SupabaseNotificationRepository`:
+  fetch/markAsRead/delete on `notifications`; get/update/create-once on
+  `notification_preferences`. **No client INSERT on `notifications`** — the
+  client cannot create them, only read/update/delete its own.
+- `features/auth/auth_controller.dart`: `signUp()` now also inserts the
+  default `notification_preferences` row (per the doc's "run only once after
+  signup").
+- `features/notifications/notifications_screen.dart` (REWORKED) — icon
+  mapping for the 11 real types; swipe-to-delete + tap-to-mark-read now call
+  the real repository; pull-to-refresh added since there's **no realtime**
+  (doc is explicit: refresh manually). Deep-links by `type`: `newLike` →
+  Likes; `newMatch`/`newMessage`/`callIncoming`/`callMissed` → Messages list
+  (their `data` carries a `conversation_id`, not a partner user id, and the
+  chat route is keyed by partner id, so this avoids guessing a lookup that
+  doesn't exist); `profileView`/`profileVerified` → Profile;
+  `subscription*` → Subscription; `reportUpdate` → Safety Reports.
+- Verified: `flutter analyze` clean, `flutter test` green (2, unchanged). Not
+  run on-device — client can't create notifications, so testing needs
+  backend to have inserted at least one row for a test account.
+- Deferred (explicit user decision): Settings screen's Notifications section
+  (Push/Email/Sound/Vibration) left as mock UI — Sound/Vibration have no
+  backing column anywhere; wiring the real 8-toggle preferences UI is a
+  separate pass.
+
+**BACKEND INTEGRATION — Profile Photos module (built, 2026-07-08).** Wired
+against `009_profile_photos.sql`/`010_profile_photos_rls.sql`, the
+`sync_primary_profile_photo` trigger, and the `set_primary_profile_photo` RPC
+from `app doctumant/migration_005,006,007.md`. **This doc was verified by
+static trace through the migration SQL, not against a live database** — smoke
+test the upload → set-primary → discover-feed flow for real before shipping.
+**No storage bucket/upload pipeline exists** — `photo_url` has no real image
+source yet, so writes use clearly-labeled placeholder `picsum.photos` URLs as
+a stand-in (user decision) while the full read/write/set-primary/delete flow
+runs for real against Supabase.
+- `shared/models/profile_photo.dart` (NEW) — mirrors `profile_photos` exactly.
+- `shared/data/profile_photo_repository.dart` (NEW) — `SupabaseProfilePhotoRepository`:
+  `myPhotos()`/`addPhoto()`/`setPrimary()` (via the RPC)/`deletePhoto()`. Maps
+  `23505` (display_order slot taken) → `ProfilePhotoSlotTakenException`,
+  `23514` (constraint violation) → `ProfilePhotoConstraintException`.
+- `features/profile/profile_screen.dart` — gallery is now a live grid: tap a
+  non-primary photo to make it primary (RPC), long-press to delete, "+" tile
+  (shown under the 4-photo cap) adds a placeholder photo at the next free
+  `display_order`. Primary-photo changes invalidate `currentUserProvider` too,
+  since `profiles.photo_url` is kept in sync by the DB trigger.
+- `features/onboarding/profile_setup_screen.dart` — the avatar step now
+  inserts a real `profile_photos` row (`display_order: 1, is_primary: true`)
+  instead of flipping a local bool; the trigger mirrors it onto
+  `profiles.photo_url` automatically, so Discover/Likes/Matches (which all
+  read that column) pick it up with no extra wiring.
+- Local `_maxProfilePhotos = 4` constant used instead of
+  `AppConstants.maxGalleryPhotos` (=6) for this flow's slot math, since 4 is
+  the real DB constraint. **Flagged, not resolved:** that mismatch — the
+  `maxGalleryPhotos` constant may be intentional scope for a future
+  non-`profile_photos` feature, or just stale; reconcile if it turns out unused.
+- Verified: `flutter analyze` clean, `flutter test` green (2, unchanged). Not
+  run on-device — this module specifically deserves a live walkthrough given
+  the doc's own "static trace only" caveat.
+- Deferred: no RPC for adding a photo or reordering (direct table access under
+  RLS is the only path today), no auto-promotion of a new primary when the
+  current one is deleted (`profiles.photo_url` just keeps its last-synced value).
+
+**FRONT-END — Media upload feature (built, 2026-07-08→09).** Real photo/video/
+voice capture + upload replaces every placeholder-URL / no-op media spot that
+has a screen today. `image_picker` + `google_mlkit_face_detection` +
+`record` + `video_thumbnail` + `path_provider` added.
+- `core/media/photo_picker_service.dart` (NEW) — `pickProfilePhoto` (with
+  ML-Kit **face-check** — rejects non-person photos), `pickChatImage`/
+  `pickChatVideo` (no face-check; video generates a thumbnail).
+- `core/media/photo_source_sheet.dart` (NEW) — shared "Take Photo / Choose
+  from Gallery" sheet. `core/media/voice_recorder_service.dart` (NEW) —
+  `record`-based voice notes.
+- `shared/data/profile_photo_repository.dart`: `uploadPhoto()` → **public
+  `avatars`** bucket. `shared/data/chat_repository.dart`: `uploadChatImage`/
+  `uploadChatVideo`/`uploadVoice` → **private** `chat-images`/`chat-files`/
+  `chat-file-thumbs`/`voice-messages` buckets (7-day signed URLs).
+- Wired: onboarding avatar + gallery (real photos, face-checked); Profile
+  gallery "+"/avatar badge (face-checked); Chat attach (image/video) + voice
+  message; chat bubbles now render image/video(thumb+play)/audio.
+- Android manifest: CAMERA + RECORD_AUDIO perms + ML-Kit face model metadata.
+- Face-check is **profile photos only** (chat media unrestricted); the
+  authoritative human/NSFW gate is still the server `moderate-image` fn — not
+  built (**[BE-5]** in `app doctumant/BACKEND_REMAINING.md`).
+- **⚠️ REQUIRES the user to create 5 Storage buckets:** public `avatars`;
+  private `chat-images`, `chat-files`, `chat-file-thumbs`, `voice-messages`.
+  Uploads fail until they exist. Verified `flutter analyze`/`test` green; NOT
+  run on-device (needs camera/mic + the buckets).
+- Deferred media spots (need new screens/backend): video profile, ID/selfie
+  verification, Wise receipt; chat emoji picker; iOS Info.plist usage strings.
+
+The next slice is whatever migration lands next, or wiring unmatch/block into
+the Matches tab UI, the Calls tab/UI on top of `CallRepository`, or the real
+`notification_preferences` toggles into Settings. Reconcile plan names before
+touching Subscription. Two comprehensive gap docs now exist:
+`app doctumant/FRONTEND_REMAINING.md` + `BACKEND_REMAINING.md`.
 
 **Tooling note (Windows):** Flutter SDK **3.44.4 / Dart 3.9** lives at **`C:\flutter`**
 (moved off `D:\app dev\tute\flutter` because the space in that path broke the

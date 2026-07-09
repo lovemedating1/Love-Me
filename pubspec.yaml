@@ -22,6 +22,13 @@ dependencies:
   # Backend
   supabase_flutter: ^2.8.0
 
+  # Media capture + on-device photo validation
+  image_picker: ^1.1.2
+  google_mlkit_face_detection: ^0.13.1
+  record: ^7.1.1            # voice message recording (5.x ships a broken record_linux)
+  video_thumbnail: ^0.5.3   # thumbnail for chat video messages (DB-required)
+  path_provider: ^2.1.4     # temp paths for recording/thumbnail files
+
   # State & DI
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1

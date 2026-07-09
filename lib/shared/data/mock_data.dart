@@ -1,7 +1,4 @@
-import '../models/app_notification.dart';
-import '../models/conversation.dart';
 import '../models/device_session.dart';
-import '../models/message.dart';
 import '../models/profile.dart';
 import '../models/safety_report.dart';
 import '../models/subscription_plan.dart';
@@ -121,66 +118,6 @@ class MockData {
     relationshipGoal: 'Long-term',
   );
 
-  static final List<Conversation> conversations = [
-    Conversation(
-      partnerId: 'u1',
-      partnerName: 'Sara',
-      partnerPhotoUrl: _avatar(1),
-      lastMessage: 'That sounds perfect 😊',
-      lastAt: DateTime.now().subtract(const Duration(minutes: 4)),
-      unreadCount: 2,
-      isOnline: true,
-      isVerified: true,
-    ),
-    Conversation(
-      partnerId: 'u3',
-      partnerName: 'Amara',
-      partnerPhotoUrl: _avatar(3),
-      lastMessage: 'Haha you have to try it!',
-      lastAt: DateTime.now().subtract(const Duration(hours: 2)),
-      isOnline: true,
-      isVerified: true,
-    ),
-    Conversation(
-      partnerId: 'u4',
-      partnerName: 'Noah',
-      partnerPhotoUrl: _avatar(4),
-      lastMessage: 'Let\'s plan that trip.',
-      lastAt: DateTime.now().subtract(const Duration(days: 1)),
-      isMuted: true,
-      isVerified: true,
-    ),
-  ];
-
-  static final List<AppNotification> notifications = [
-    AppNotification(
-      id: 'n1',
-      type: NotificationType.match,
-      title: 'It\'s a match!',
-      body: 'You and Sara liked each other.',
-      createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
-      relatedUserId: 'u1',
-    ),
-    AppNotification(
-      id: 'n2',
-      type: NotificationType.like,
-      title: 'New like',
-      body: 'Amara liked your profile.',
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      isRead: false,
-      relatedUserId: 'u3',
-    ),
-    AppNotification(
-      id: 'n3',
-      type: NotificationType.message,
-      title: 'New message',
-      body: 'Noah sent you a message.',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      isRead: true,
-      relatedUserId: 'u4',
-    ),
-  ];
-
   /// Profiles who liked "me" (Liked You tab) — a subset of [profiles].
   static List<Profile> get likedYou =>
       profiles.where((p) => ['u2', 'u3', 'u5'].contains(p.userId)).toList();
@@ -193,57 +130,6 @@ class MockData {
   static const int viewsCount = 128;
   static const int likesCount = 42;
   static const int matchesCount = 7;
-
-  /// Messages keyed by partner id (Chat screen).
-  static Map<String, List<Message>> messages = {
-    'u1': [
-      Message(
-        id: 'm1',
-        senderId: 'u1',
-        text: 'Hey Alex! Loved your travel photos 😊',
-        sentAt: DateTime.now().subtract(const Duration(minutes: 40)),
-        isRead: true,
-      ),
-      Message(
-        id: 'm2',
-        senderId: 'me',
-        text: 'Thanks Sara! Where was your last trip?',
-        sentAt: DateTime.now().subtract(const Duration(minutes: 32)),
-        isRead: true,
-      ),
-      Message(
-        id: 'm3',
-        senderId: 'u1',
-        text: 'Zanzibar — beaches were unreal 🏝️',
-        sentAt: DateTime.now().subtract(const Duration(minutes: 20)),
-        isRead: true,
-        reaction: '❤️',
-      ),
-      Message(
-        id: 'm4',
-        senderId: 'u1',
-        text: 'That sounds perfect 😊',
-        sentAt: DateTime.now().subtract(const Duration(minutes: 4)),
-        isRead: false,
-      ),
-    ],
-    'u3': [
-      Message(
-        id: 'm5',
-        senderId: 'me',
-        text: 'That new cafe downtown is amazing',
-        sentAt: DateTime.now().subtract(const Duration(hours: 3)),
-        isRead: true,
-      ),
-      Message(
-        id: 'm6',
-        senderId: 'u3',
-        text: 'Haha you have to try it!',
-        sentAt: DateTime.now().subtract(const Duration(hours: 2)),
-        isRead: true,
-      ),
-    ],
-  };
 
   /// Countries for Explore, with mock user counts.
   static const List<({String flag, String name, int count})> countries = [

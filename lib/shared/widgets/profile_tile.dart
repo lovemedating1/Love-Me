@@ -14,12 +14,14 @@ class ProfileTile extends StatelessWidget {
     super.key,
     required this.profile,
     this.onTap,
+    this.onLongPress,
     this.blurred = false,
     this.overlayIcon,
   });
 
   final Profile profile;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final bool blurred;
   final IconData? overlayIcon;
 
@@ -28,6 +30,7 @@ class ProfileTile extends StatelessWidget {
     final theme = Theme.of(context);
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: AspectRatio(

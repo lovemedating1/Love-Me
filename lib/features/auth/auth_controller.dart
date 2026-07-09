@@ -128,6 +128,9 @@ class AuthController extends Notifier<AuthState> {
           'country': '',
           'ringtone': '',
         });
+        await _client
+            .from('notification_preferences')
+            .insert({'user_id': user.id});
       }
       state = state.copyWith(
           session: res.session,

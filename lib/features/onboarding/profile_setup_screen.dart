@@ -6,11 +6,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/route_paths.dart';
+import '../../core/media/photo_picker_service.dart';
+import '../../core/media/photo_source_sheet.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/validators.dart';
+import '../../shared/data/repositories.dart';
 import '../auth/auth_controller.dart';
 
-/// 04 — ProfileSetupPage. 4-step onboarding wizard (mock; no real upload).
+/// `profile_photos.display_order` is constrained to 1-4 — the wizard's
+/// avatar (slot 1, primary) + gallery slots below cap at that total.
+const _maxProfilePhotos = 4;
+
+/// 04 — ProfileSetupPage. 4-step onboarding wizard. The avatar step lets the
+/// user take/choose a real photo, validates on-device that it contains a face
+/// (rejecting non-person photos), uploads it to the `avatars` Storage bucket,
+/// and inserts a real `profile_photos` row (is_primary: true) — the
+/// `sync_primary_profile_photo` trigger mirrors it onto `profiles.photo_url`.
 class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
 
@@ -28,9 +39,16 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   DateTime? _dob;
   String? _gender;
   String _seeking = 'both';
-  // Step 2 (mock photo slots)
-  bool _avatarAdded = false;
-  final List<bool> _gallery = List.filled(AppConstants.maxGalleryPhotos - 1, false);
+  // Step 2 — avatar inserts a real primary profile_photos row; the gallery
+  // adds real non-primary rows (up to the 4-photo cap). We track the added
+  // photos locally so the wizard reflects real state as it's built.
+  String? _avatarUrl;
+  bool _avatarSaving = false;
+  final List<String> _galleryUrls = []; // uploaded gallery photo URLs
+  int? _gallerySavingSlot; // index currently uploading, for the spinner
+
+  bool get _avatarAdded => _avatarUrl != null;
+  int get _photoCount => (_avatarAdded ? 1 : 0) + _galleryUrls.length;
   // Step 3
   final _bio = TextEditingController();
   final Set<String> _interests = {};
@@ -128,6 +146,82 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
   void _back() {
     if (_step > 0) setState(() => _step--);
+  }
+
+  /// Lets the user take/choose a photo, validates on-device that it contains
+  /// a face (rejecting non-person photos), uploads it to the `avatars` bucket,
+  /// and inserts a real primary `profile_photos` row. The
+  /// `sync_primary_profile_photo` trigger mirrors it onto `profiles.photo_url`.
+  Future<void> _pickAvatar() async {
+    final source = await showPhotoSourceSheet(context);
+    if (source == null || !mounted) return;
+
+    setState(() => _avatarSaving = true);
+    try {
+      final picker = ref.read(photoPickerServiceProvider);
+      final picked = await picker.pickProfilePhoto(source);
+
+      final repo = ref.read(profilePhotoRepositoryProvider);
+      final url = await repo.uploadPhoto(picked.bytes,
+          fileExtension: picked.fileExtension);
+      await repo.addPhoto(photoUrl: url, displayOrder: 1, isPrimary: true);
+
+      ref.invalidate(currentUserProvider);
+      if (mounted) setState(() => _avatarUrl = url);
+    } on PhotoPickCancelled {
+      // User backed out — no-op.
+    } on NoFaceDetectedException {
+      if (mounted) {
+        _toast('That doesn\'t look like a photo of a person. Please upload a '
+            'clear photo of yourself.', error: true);
+      }
+    } on MediaUploadException catch (e) {
+      if (mounted) _toast(e.message, error: true);
+    } catch (e) {
+      if (mounted) _toast('Could not add photo: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _avatarSaving = false);
+    }
+  }
+
+  /// Adds a real non-primary gallery photo (face-validated, uploaded) at the
+  /// next free `display_order` slot, up to the 4-photo cap.
+  Future<void> _pickGalleryPhoto(int slotIndex) async {
+    if (_photoCount >= _maxProfilePhotos) {
+      _toast('You can add up to $_maxProfilePhotos photos.');
+      return;
+    }
+    final source = await showPhotoSourceSheet(context);
+    if (source == null || !mounted) return;
+
+    setState(() => _gallerySavingSlot = slotIndex);
+    try {
+      final picker = ref.read(photoPickerServiceProvider);
+      final picked = await picker.pickProfilePhoto(source);
+
+      final repo = ref.read(profilePhotoRepositoryProvider);
+      // Slot = current photo count + 1 (avatar is slot 1). Since gallery is
+      // only reachable after the avatar, the next free display_order is
+      // simply the current total + 1.
+      final displayOrder = _photoCount + 1;
+      final url = await repo.uploadPhoto(picked.bytes,
+          fileExtension: picked.fileExtension);
+      await repo.addPhoto(photoUrl: url, displayOrder: displayOrder);
+      if (mounted) setState(() => _galleryUrls.add(url));
+    } on PhotoPickCancelled {
+      // User backed out — no-op.
+    } on NoFaceDetectedException {
+      if (mounted) {
+        _toast('That doesn\'t look like a photo of a person. Please upload a '
+            'clear photo of yourself.', error: true);
+      }
+    } on MediaUploadException catch (e) {
+      if (mounted) _toast(e.message, error: true);
+    } catch (e) {
+      if (mounted) _toast('Could not add photo: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _gallerySavingSlot = null);
+    }
   }
 
   Future<void> _useLocation() async {
@@ -276,10 +370,10 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   Widget _step2() => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _stepTitle('Your photos', 'Add a profile photo (and up to 5 more)'),
+          _stepTitle('Your photos', 'Add a clear photo of yourself'),
           Center(
             child: GestureDetector(
-              onTap: () => setState(() => _avatarAdded = !_avatarAdded),
+              onTap: _avatarSaving ? null : _pickAvatar,
               child: Container(
                 width: 120,
                 height: 120,
@@ -288,47 +382,63 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.pink, width: 2),
                 ),
-                child: Icon(
-                  _avatarAdded ? LucideIcons.check : LucideIcons.camera,
-                  size: 40,
-                  color: _avatarAdded ? AppColors.success : AppColors.pink,
-                ),
+                child: _avatarSaving
+                    ? const Padding(
+                        padding: EdgeInsets.all(40),
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(
+                        _avatarAdded ? LucideIcons.check : LucideIcons.camera,
+                        size: 40,
+                        color: _avatarAdded ? AppColors.success : AppColors.pink,
+                      ),
               ),
             ),
           ),
           const SizedBox(height: 8),
           Center(
-              child: Text(_avatarAdded ? 'Photo added (mock)' : 'Tap to add avatar',
+              child: Text(_avatarAdded ? 'Photo added' : 'Tap to add avatar',
                   style: Theme.of(context).textTheme.bodySmall)),
           const SizedBox(height: 20),
-          Text('Gallery', style: Theme.of(context).textTheme.titleMedium),
+          Text('More photos (optional)',
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              for (var i = 0; i < _gallery.length; i++)
-                GestureDetector(
-                  onTap: () => setState(() => _gallery[i] = !_gallery[i]),
-                  child: Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      _gallery[i] ? LucideIcons.image : LucideIcons.plus,
-                      color: _gallery[i] ? AppColors.pink : null,
-                    ),
-                  ),
-                ),
+              for (var i = 0; i < _maxProfilePhotos - 1; i++)
+                _gallerySlot(i),
             ],
           ),
         ],
       );
+
+  Widget _gallerySlot(int i) {
+    final filled = i < _galleryUrls.length;
+    final saving = _gallerySavingSlot == i;
+    // Only the next empty slot is tappable (fill in order).
+    final tappable = !filled && !saving && i == _galleryUrls.length;
+    return GestureDetector(
+      onTap: tappable ? () => _pickGalleryPhoto(i) : null,
+      child: Container(
+        width: 88,
+        height: 88,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: saving
+            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+            : filled
+                ? Image.network(_galleryUrls[i], fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        const Icon(LucideIcons.image, color: AppColors.pink))
+                : Icon(LucideIcons.plus,
+                    color: tappable ? AppColors.pink : null),
+      ),
+    );
+  }
 
   Widget _step3() {
     final count = _bio.text.length;

@@ -1,0 +1,1155 @@
+================================================================================
+ LOVE ME INTERNATIONAL — DEVELOPER LOG
+================================================================================
+
+Purpose
+-------
+A running journal of actual development work on this Flutter app. Every time a
+real change is made (dependencies added, a feature/screen built, a bug fixed,
+config changed, a spec conflict resolved), append a dated entry below.
+
+This file records what was DONE, not what is planned. Plans live in README.md
+and the specs under `app doctumant/`.
+
+Entry format
+------------
+[YYYY-MM-DD] <Phase / area>
+  - What changed (files touched, packages added)
+  - Why
+  - Result / verification (build ran? tests? manual check?)
+  - Open items / follow-ups
+
+--------------------------------------------------------------------------------
+ BASELINE (as of 2026-07-03)
+--------------------------------------------------------------------------------
+- Repo is a fresh `flutter create` scaffold.
+- lib/ contains only the default main.dart (counter demo).
+- pubspec.yaml has only cupertino_icons + flutter_lints; NONE of the documented
+  dependencies (Riverpod, supabase_flutter, go_router, Firebase, etc.) are added.
+- Spec bundle read and analyzed; README.md and CLAUDE.md authored from it.
+- No app feature has been implemented yet.
+
+Known items to resolve before / during build (from spec analysis):
+  1. Plan-name mismatch — Backend doc: Premium/VIP/Elite; product roadmap
+     (app.docx): Free/Basic+/Gold/Platinum/Premium Elite/VIP Elite. Reconcile
+     before building SubscriptionScreen (plan_name is free text in DB).
+  2. Palette drift — UI doc & screen JSON use gold #FFB800 / #FFD500 and a
+     white-ish background in some token sets, while app.docx lists #FF2E93 /
+     #FFD700 / #FFF0F6. Pick one canonical AppColors set. README follows the
+     Flutter Rebuild + UI docs (#E6287A pink, #FFB800 gold).
+  3. Backend doc says "30 tables" in one place and "29" in another; treat the
+     per-table list in §4 as authoritative.
+  4. app.docx is Markdown misnamed .docx (open as text).
+
+--------------------------------------------------------------------------------
+ DEVELOPMENT ENTRIES (append below as work happens)
+--------------------------------------------------------------------------------
+
+[2026-07-03 18:32 IST] Front-end plan created — PROJECT KICKOFF (no code yet)
+  What changed:
+    - Added FRONTEND_PLAN.md: the complete front end divided into 4 phases
+      (1 Foundation/Design System · 2 Auth+Onboarding+Discover ·
+       3 Likes/Messages/Chat/Explore/Profile/Subscription · 4 Settings/Safety/
+       Legal/Admin/Polish). One phase executed at a time.
+    - Updated CLAUDE.md "Current state" + added a "Front-end build plan" section
+      pointing at FRONTEND_PLAN.md and the mock-first / one-phase-at-a-time rule.
+  Decisions locked (from user):
+    - Build FRONT END FIRST with mock/in-memory data only; backend integration is
+      a separate track after all 4 phases.
+    - Canonical palette = pink #E6287A + gold #FFB800 (Roboto, 448px max width).
+      This resolves the palette-drift open item for the front end.
+    - Plan-name conflict stays deferred (placeholder tiers in Phase 3).
+  What I have / verified:
+    - Full spec bundle read (backend API doc, Flutter rebuild doc, UI doc, product
+      roadmap, 23 screen JSONs). Front end is fully specified and buildable.
+    - Repo still baseline: fresh flutter create scaffold, default main.dart, no
+      target deps in pubspec.yaml. No feature code exists yet.
+  Result: Planning artifacts written. No app code changed this session.
+  Next: On user "go", execute PHASE 1 (deps, folder scaffold, theme/AppColors,
+        router + 5-tab shell, base widgets, mock-data layer).
+
+[2026-07-03 19:26 IST] PHASE 1 — Foundation & Design System (BUILT, analyze clean)
+  What changed (all new unless noted):
+    - pubspec.yaml (REPLACED scaffold): front-end-only deps — flutter_riverpod,
+      riverpod_annotation, hooks_riverpod, flutter_hooks, go_router, google_fonts,
+      lucide_icons, flutter_svg, cached_network_image, shimmer, flutter_slidable,
+      flutter_form_builder, form_builder_validators, intl, uuid, collection,
+      equatable, freezed_annotation, json_annotation, logger; dev: build_runner,
+      freezed, json_serializable, riverpod_generator, flutter_lints. Declares
+      assets/images/ + assets/mock/. Backend/native SDKs deliberately omitted.
+    - lib/core/theme/: app_colors.dart (#E6287A pink, #FFB800 gold, light+dark
+      swatches, semantic colors), app_text_styles.dart (Roboto scale via
+      google_fonts), app_gradients.dart (header/premium/gold/vip), app_theme.dart
+      (light() + dark() ThemeData: buttons r14, cards r16, inputs, chips).
+    - lib/core/constants/: app_constants.dart (caps, limits, sizes),
+      route_paths.dart (all 23 routes + chatTo()).
+    - lib/core/router/: app_router.dart (go_router, ShellRoute wrapping the 5 tabs
+      in AppShell, all secondary/legal/admin routes as _FullScreen placeholders,
+      404 errorBuilder), router_guards.dart (PERMISSIVE STUB — real auth/profile
+      redirects commented for the backend track).
+    - lib/shared/models/: profile.dart, conversation.dart, app_notification.dart
+      (hand-written immutable Equatable models — no codegen needed to run).
+    - lib/shared/data/: mock_data.dart (5 sample profiles + me + convos + notifs,
+      picsum placeholder avatars), repositories.dart (Profile/Conversation/
+      Notification repo INTERFACES + Mock impls + Riverpod providers = the seam the
+      backend track swaps; currentUserProvider).
+    - lib/shared/widgets/: app_avatar.dart (online dot + verified badge),
+      app_header.dart (gradient header + HeaderAction w/ badge), bottom_nav.dart
+      (5 tabs, badges/dots), app_shell.dart (header+body+nav, 448px cap, centered),
+      state_views.dart (SkeletonBox/EmptyView/ErrorView), placeholder_screen.dart.
+    - lib/app.dart (MaterialApp.router + light/dark theme + l10n delegates),
+      lib/bootstrap.dart (ProviderScope; TODO markers for Supabase/Firebase init),
+      lib/main.dart (now just `bootstrap()`).
+    - test/widget_test.dart (REPLACED counter test): smoke test — app boots to the
+      tab shell (asserts 'Love Me' + Discover/Messages/Profile present).
+    - assets/images/.gitkeep, assets/mock/README.md.
+  Why: Phase 1 of FRONTEND_PLAN.md — the foundation every later screen stands on.
+  Environment fixes done this session (were blocking any build):
+    - Flutter SDK was 3.16.7/Dart 3.2.4 but project needs newer → user approved,
+      ran `flutter upgrade` → now Flutter 3.44.4 / Dart 3.9 (stable).
+    - git "dubious ownership" on the SDK repo was surfacing as "git not found";
+      fixed via `git config --global --add safe.directory` for the SDK (+ '*').
+    - Dep version conflicts on the new SDK, resolved: intl ^0.19.0 → ^0.20.2
+      (SDK pins 0.20.2); flutter_form_builder ^9.5.0 → ^10.3.0,
+      form_builder_validators ^11.0.0 → ^11.1.2.
+  Result / verification (ALL GREEN):
+    - `flutter pub get` → OK.
+    - `flutter analyze` → **No issues found.** (fixed leftover MyApp test ref,
+      unnecessary_underscores → wildcard `_`, one unused import.)
+    - `flutter test` → **All tests passed** — smoke test confirms the app boots to
+      the 5-tab shell (header wordmark + all 5 nav labels render) with mock data.
+  Environment blockers hit AND fixed this session (in order):
+    a. SDK too old (3.16.7) → user approved upgrade → Flutter 3.44.4 / Dart 3.9.
+    b. git "dubious ownership" on SDK repo → safe.directory config.
+    c. dep conflicts on new SDK → intl ^0.20.2, flutter_form_builder ^10.3.0,
+       form_builder_validators ^11.1.2.
+    d. Native-assets bug: `google_fonts` → `objective_c` build hook crashed on the
+       SPACE in the SDK path `D:\app dev\tute\flutter`. FIX (user-approved): moved
+       the whole SDK to `C:\flutter` (robocopy, 3.17 GB) + safe.directory. Now
+       runs clean. **All flutter commands now use `C:\flutter\bin\flutter.bat`.**
+    e. `lucide_icons 0.257.0` incompatible with Flutter 3.44 (tried to extend the
+       now-`final` IconData class) → switched to `lucide_icons_flutter ^3.0.0`
+       (same LucideIcons API); updated 6 imports.
+  Open items / follow-ups:
+    1. Plan-name conflict still deferred (Phase 3 Subscription).
+    2. Roboto currently via `google_fonts` (runtime fetch). Docs prefer BUNDLED
+       Roboto .ttf for offline reliability — optional polish for Phase 4 (need the
+       font files).
+  Tooling for next sessions: SDK at C:\flutter (git NOT on sandbox PATH; prepend
+    `C:\Program Files\Git\cmd`). Run in one command:
+    $env:PATH="C:\Program Files\Git\cmd;"+$env:PATH; & "C:\flutter\bin\flutter.bat" <cmd>
+  Next: PHASE 2 (Auth, Onboarding & Discover) — await user "go".
+
+[2026-07-04 14:39 IST] PHASE 2 — Auth, Onboarding & Discover (BUILT, analyze+tests green)
+  Screens built to spec (screens-json 01-06):
+    - features/auth/auth_controller.dart: mock AuthController (Notifier<AuthState>)
+      with signIn/signUp/signInWithGoogle/requestPasswordReset/completeProfile/
+      signOut. signIn → profileComplete=true (existing user); signUp →
+      profileComplete=false (routes to onboarding). MockSession stands in for a
+      Supabase session — the seam the backend track swaps.
+    - features/auth/auth_screen.dart (01 AuthPage): Sign In / Sign Up pill tabs,
+      email+password (eye toggle), sign-up extras (confirm pwd, DOB picker, gender,
+      country, 18+/terms checkbox), remember-me, forgot-password dialog, Google
+      button, legal footer links, loading spinner + toasts, inline validation.
+    - features/auth/reset_password_dialog.dart: "Forgot password?" email dialog.
+    - features/auth/email_verified_screen.dart (02): success landing → profile-setup.
+    - features/auth/reset_password_screen.dart (03): new/confirm password + success.
+    - features/onboarding/profile_setup_screen.dart (04): 4-step wizard (basics /
+      photos / about / location) with progress bar, per-step validation, mock photo
+      slots, interests FilterChips (max 8), bio counter, "use location" mock,
+      Back/Next/Finish → completeProfile() → Discover.
+    - features/discover/discover_providers.dart: DiscoverFilters (+controller) and
+      discoverFeedProvider (FutureProvider filtering the mock feed).
+    - features/discover/discover_filters_sheet.dart: age RangeSlider, distance
+      Slider, gender chips, online/verified switches, Reset/Apply.
+    - features/discover/discover_screen.dart (06): profile card (photo, scrim,
+      name/age, distance chip, verified/online badges, bio), action row
+      (pass/super-like/like/message), "It's a Match!" overlay → chat, pull-to-
+      refresh, skeleton/empty/error states.
+    - core/utils/validators.dart: email, password, confirm, displayName, bio, dob
+      (18+), ageFrom, interests.
+  Wiring:
+    - router_guards.dart: real redirect using authControllerProvider — signed-out →
+      /auth (public routes allowed); signed-in + incomplete → /profile-setup;
+      complete but on auth/setup → /discover.
+    - app_router.dart: /auth, /email-verified, /reset-password, /profile-setup and
+      the Discover tab now REAL screens; router refreshes on auth changes via a
+      ValueNotifier bridge (ref.listen); Discover header gets a Filters action.
+  Fixes during build: LucideIcons.chrome → logIn (chrome not in the package);
+    AuthScreen sign-in row overflow at narrow widths → Flexible + ellipsis;
+    widget test hung on CachedNetworkImage/pumpAndSettle → split into 1 UI smoke
+    test (Auth boot) + 2 headless auth-controller tests.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` → **No issues found.**
+    - `flutter test` → **All tests passed** (3 tests: unauth→Auth screen renders;
+      sign-in→profileComplete; sign-up→incomplete→completeProfile).
+    - Runtime not yet driven on device/emulator this session; verified via
+      analyzer + tests. (Full `flutter run` walkthrough recommended next session.)
+  Still placeholders: Likes, Messages, Explore, Profile (Phase 3) + all Phase 4.
+  Next: PHASE 3 (Likes, Messages, Chat, Explore, Profile & Subscription) — await "go".
+
+[2026-07-04 15:04 IST] PHASE 3 — Likes, Messages, Chat, Explore, Profile & Subscription
+  Screens built to spec (screens-json 07-11, 15):
+    - shared/models: message.dart (Message + MessageType), subscription_plan.dart
+      (SubscriptionPlan — PLACEHOLDER duration tiers per screen JSON; plan-name
+      conflict still to reconcile with user before backend).
+    - shared/data/mock_data.dart: added likedYou, matches, own stats
+      (views/likes/matches), messages-per-partner map, countries (flag+count),
+      premium plans (Monthly/Quarterly/Yearly), premiumPerks.
+    - shared/data/repositories.dart: ProfileRepository +likedYou/matches/byCountry;
+      new MessageRepository (+Mock); providers: isPremiumProvider (StateProvider —
+      drives free/premium gates), likedYou/matches/conversations/messages(family)/
+      profileByIdProvider/profilesByCountry(family).
+    - shared/widgets/profile_tile.dart: square grid tile w/ optional blur (premium
+      gate), online dot, verified tick, overlay icon.
+    - core/utils/date_format.dart: RelativeTime.short/clock.
+    - features/likes/likes_screen.dart (07): Liked You / Matches tabs; free tier
+      blurs Liked You + "Unlock" CTA → subscription; matches → chat; states.
+    - features/messages/messages_screen.dart (08): Chats/Calls tabs, search,
+      conversation tiles (avatar+online, unread pill, mute, relative time),
+      swipe-to-delete (flutter_slidable) + long-press action sheet, states.
+    - features/chat/chat_screen.dart (11): partner header (avatar/presence + call
+      icons + menu), in/out bubbles w/ read receipts + reactions (long-press),
+      composer (emoji/attach/mic↔send), send appends locally; states. Calls show
+      "available after backend" toast (UI only).
+    - features/explore/explore_screen.dart (09): horizontal country flag chips
+      (flag+count) + 2-col profile grid by country; states.
+    - features/profile/profile_screen.dart (10): gradient banner (avatar+edit,
+      name/age, premium crown), stats row, Edit Profile sheet, upgrade card,
+      bio, gallery, setting rows (Settings/Notifications/Devices/Safety/Sub),
+      Premium DEMO toggle (flips isPremiumProvider), log out, delete.
+    - features/subscription/subscription_screen.dart (15): perks hero, selectable
+      plan cards (Most Popular + savings), payment buttons (Paystack/PayPal/Wise/
+      Google Play — UI only; mock checkout flips isPremium + success toast),
+      free-usage progress bars.
+  Wiring: app_router.dart — likes/messages/explore/profile tabs, /chat/:id, and
+    /subscription now REAL screens (placeholders removed for these).
+  Result / verification (ALL GREEN):
+    - `flutter analyze` → **No issues found.**
+    - `flutter test` → **All tests passed** (3 existing tests still green).
+    - Runtime: not driven on emulator this session (verified via analyzer+tests).
+    - APK: `flutter build apk --release` → **SUCCESS**. Output at
+      build/app/outputs/flutter-apk/app-release.apk (55.8 MB, built 2026-07-04
+      15:21). Contains the Phase-3 code (built from the current tree). Runs on
+      mock data only (no backend). Re-confirmed `flutter analyze` clean after the
+      session restart.
+  Still placeholders: Notifications, Settings, Devices, SafetyReports,
+    DeleteAccount, Legal (16-19), AdminDiagnostics — all Phase 4.
+  Next: PHASE 4 (Settings, Safety, Legal, Admin & Polish) — await user "go".
+
+[2026-07-04 16:28 IST] PHASE 4 — Settings, Safety, Legal, Admin & Polish (FINAL front-end phase)
+  Screens built to spec (screens-json 12,13,14,16-20,21,22,23):
+    - shared/models: safety_report.dart (SafetyReport + ReportStatus),
+      device_session.dart (DeviceSession).
+    - shared/data/mock_data.dart: +reports, +devices. repositories.dart:
+      +notificationsProvider, safetyReportsProvider, devicesProvider, and
+      isAdminProvider (StateProvider, gates admin screen).
+    - features/notifications/notifications_screen.dart (12): typed icon rows
+      (like/superlike/match/message/missed-call/safety/system), unread dots,
+      Mark-all-read, tap deep-links to likes/chat/messages/safety; states.
+    - features/settings/settings_screen.dart (13): sectioned list — Discovery
+      (age RangeSlider, distance Slider, show-me), Notifications (push/email/
+      sound/vibration switches), Privacy (hide distance/online/screenshot guard),
+      Ringtone picker, Account (devices/safety/delete/sign out), Legal links.
+    - features/devices/devices_screen.dart (14): device cards (current badge),
+      per-device sign out, "sign out everywhere else"; states.
+    - features/safety/safety_reports_screen.dart (20): report cards w/ status
+      badges (Pending/Resolved/Dismissed), detail bottom sheet, empty.
+    - features/delete_account/delete_account_screen.dart (21): destructive warning,
+      reason select, password + type-"DELETE" gate, deletes→signOut→/auth.
+    - features/legal/legal_screen.dart (16-19): one shared prose scaffold +
+      factory builders privacy()/terms()/refund()/childSafety() (placeholder copy).
+    - features/admin/admin_diagnostics_screen.dart (22): admin-gated (isAdmin)
+      tabbed logs (Payments/GPS/Push/Emails); non-admins see 403 + "preview as
+      admin (demo)" button.
+    - features/misc/not_found_screen.dart (23): 404 + Return home.
+    - core/utils/date_format.dart reused for relative times.
+  Wiring: app_router.dart — all remaining routes now REAL (notifications, settings,
+    devices, safety-reports, delete-account, privacy/terms/refund/child-safety,
+    admin/diagnostics, 404 errorBuilder = NotFoundScreen). Removed the _FullScreen
+    placeholder helper; placeholder_screen.dart is now unused (left in tree, unref).
+  Polish: dark mode covered by AppTheme.light/dark (all screens read theme colors,
+    no hardcoded); icon-buttons carry tooltips; 448px cap via AppShell; consistent
+    Skeleton/Empty/Error state views across list screens.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` → **No issues found.**
+    - `flutter test` → **All tests passed** (3).
+    - Runtime not driven on emulator this session (verified via analyzer+tests);
+      a `flutter run` walkthrough + fresh release APK recommended as the checkpoint.
+  MILESTONE: all 23 screens built — the COMPLETE front end (mock-data) is done.
+  Next: BACKEND INTEGRATION track (separate). First reconcile with user: (1) plan
+    names (Subscription still uses placeholder duration tiers); (2) then swap the
+    Mock* repositories for supabase_flutter data sources behind the same interfaces.
+
+[2026-07-04 (session 2)] BACKEND INTEGRATION — Phase 1: Auth & Profile layer (BUILT, analyze+tests green)
+  Scope: wired against the 6 tables live as of migrations 001_auth_profiles.sql +
+    002_auth_profiles_rls.sql (per app doctumant/migration_001.md). Everything
+    else (matches, messages, payments, etc.) remains mock — not yet built server-side.
+  Decisions confirmed with user before building:
+    - Profile fields not yet backed by a column/table (bio, gallery, interests,
+      isPremium, isOnline) stay LOCAL-ONLY defaults on the model; not sent to
+      Supabase until their columns/tables ship.
+    - profiles row is created immediately after auth.signUp() (minimal: user_id/
+      name/city/country/ringtone, profile_complete=false); the onboarding wizard
+      PATCHes the rest and flips profile_complete=true at Finish.
+    - active_sessions / fcm_tokens / user_presence / single-device enforcement
+      deferred to a later pass — this phase is Auth + profiles CRUD only.
+  What changed:
+    - pubspec.yaml: added supabase_flutter ^2.8.0.
+    - lib/core/config/supabase_config.dart (NEW): SUPABASE_URL/SUPABASE_ANON_KEY
+      via --dart-define (never hardcoded — CLAUDE.md rule 3). .vscode/launch.json
+      (NEW) carries the dev dart-defines for F5 runs (anon/publishable key only,
+      safe to have in a local launch config).
+    - lib/bootstrap.dart: now calls Supabase.initialize(url, publishableKey) before
+      runApp; asserts the dart-defines are non-empty.
+    - lib/shared/models/profile.dart (REWRITTEN): mirrors the live `profiles`
+      table — added birthday (date, replaces the old int `age`; age/ageLabel are
+      now computed getters), orientation, interestedIn, maritalStatus, hobbies,
+      distancePreferenceKm, isVerified, profileComplete, isPremium(read-only),
+      ringtone; city/country now required non-nullable. Added fromJson/
+      toInsertJson mirroring the REST wire shape. bio/gallery/interests/isOnline
+      kept as local-only fields (see scope note above).
+    - lib/features/auth/auth_controller.dart (REWRITTEN): AuthState now wraps a
+      real `supabase.Session` + profileComplete (fetched from `profiles` on
+      sign-in, defaulted false on sign-up); AuthController drives
+      signUp/signIn/signInWithGoogle(OAuth)/requestPasswordReset(real email)/
+      signOut through supabase.auth, listens to onAuthStateChange, and inserts
+      the minimal profiles row on signUp. completeProfile() renamed
+      markProfileComplete() (called after the onboarding PATCH succeeds, not
+      before).
+    - lib/shared/data/repositories.dart: added SupabaseProfileRepository — me()/
+      byId() hit the real `profiles` table; discoverFeed/likedYou/matches/
+      byCountry still return MockData (documented inline: blocked on matches/
+      likes tables that don't exist yet). profileRepositoryProvider now points at
+      SupabaseProfileRepository. MockProfileRepository kept in tree (unused) as
+      the swap-back reference for local/offline dev.
+    - lib/features/onboarding/profile_setup_screen.dart: Finish button now PATCHes
+      /rest/v1/profiles (name/birthday/gender/interested_in/relationship_goal/
+      hobbies/country/city/profile_complete:true) for the current auth user, then
+      calls markProfileComplete(); error toast + re-enables the button on failure.
+    - lib/features/auth/auth_screen.dart: catches AuthException from
+      signIn/signUp and surfaces `e.message` as a toast instead of throwing.
+    - lib/features/auth/reset_password_screen.dart: "set new password" step now
+      calls supabase.auth.updateUser(password:) instead of a fake delay.
+    - lib/core/router/router_guards.dart: doc comment updated (logic unchanged —
+      already worked off signedIn/profileComplete getters, which still exist on
+      the new AuthState shape).
+    - lib/shared/data/mock_data.dart: profiles/me construction switched from
+      `age: N` to `birthday: _birthdayForAge(N)` (new private helper) since
+      `age` is no longer a settable field.
+    - Display-site fixes for the now-nullable `age`: added Profile.ageLabel
+      ('–' fallback); used in profile_tile.dart, profile_screen.dart,
+      discover_screen.dart. discover_providers.dart's age-range filter now
+      null-safe. Removed now-dead null-checks on the newly non-nullable `city`
+      in discover_screen.dart/profile_screen.dart.
+    - test/widget_test.dart (REWRITTEN): the old tests drove signIn/signUp
+      against the mock controller and asserted profileComplete transitions —
+      no longer possible headlessly now that AuthController makes real network
+      calls and needs Supabase.initialize() (SharedPreferences-backed session
+      storage, live recoverSession() call). Replaced with two fast unit tests on
+      AuthState's default shape and copyWith(clearSession:). Full auth/onboarding
+      flow verification is manual (flutter run against the live project).
+  Result / verification (ALL GREEN):
+    - `flutter pub get` → OK (supabase_flutter 2.15.4 resolved).
+    - `flutter analyze` → **No issues found.**
+    - `flutter test` → **All tests passed** (2 tests).
+    - NOT driven on an emulator this session — recommend a `flutter run
+      --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...` (or the
+      new .vscode/launch.json config) walkthrough next: sign up → verify a
+      `profiles` row appears in Supabase → complete onboarding → confirm
+      profile_complete flips → sign out/in.
+  Open items / follow-ups:
+    1. Google OAuth (signInWithOAuth) needs a redirect URL / deep link scheme
+       configured in the Supabase dashboard + Android manifest before it will
+       actually complete on-device — untested this session.
+    2. active_sessions (single-device enforcement), fcm_tokens, user_presence —
+       deferred, per user decision above.
+    3. Plan-name conflict (Subscription) still unresolved — unrelated to this
+       migration, carried over from Phase 3.
+    4. bio/gallery/interests/isPremium/isOnline remain local-only until their
+       backing columns/tables ship — re-visit Profile model + onboarding wizard
+       (photo upload, bio, interests) once that migration lands.
+  Next: manual run-through of the auth+onboarding flow against the live Supabase
+    project, then the next backend slice (likely matches/likes or messages)
+    once that migration is written.
+
+[2026-07-06] BUGFIX — sign-up 42501 (RLS) on the profiles insert
+  What happened: real device test hit `PostgrestException(...new row violates
+    row-level security policy for table "profiles"..., code: 42501)` right after
+    signUp(). Root cause: the Supabase project has "Confirm email" ON, so
+    auth.signUp() returns a user but NO session until the confirmation link is
+    clicked — the profiles INSERT that follows in AuthController.signUp() has no
+    access_token, so `auth.uid()` is null server-side and the
+    `auth.uid() = user_id` RLS policy rejects it.
+  Decision (user): disable "Confirm email" in the Supabase dashboard
+    (Authentication → Providers → Email) rather than restructure the code to
+    defer profile-row creation until post-confirmation. No app code changed for
+    this fix — it's a dashboard setting only. Re-enable before production launch
+    (and if re-enabled, the profiles-insert-on-signUp flow will need revisiting).
+
+[2026-07-06] BACKEND INTEGRATION — Phase 2: Matching module (likes/passes/matches) (BUILT, analyze+tests green)
+  Scope: wired against `003_matching.sql` + `004_matching_rls.sql` per
+    app doctumant/migration_002.md — likes, passes, matches, profile_views.
+    Matches are NOT client-created: no mutual-like trigger exists yet, so
+    `matches` is read/update-only from the app (unmatch/block), same as the doc
+    specifies. profile_views wiring deferred (no quota UI consumes it yet).
+  Decisions confirmed with user before building:
+    - No "It's a Match!" popup on like anymore (the old mock 'every 2nd like'
+      logic is gone) — the backend can't yet tell us a like was mutual. Just a
+      "You liked X" toast. The Likes screen instead subscribes to `matches`
+      realtime inserts and pops the overlay if/when a match row actually lands
+      (future-proofed for when the trigger ships).
+    - Discover's candidate deck (still mock — real discovery/ranking isn't
+      server-side yet) now excludes profiles already liked/passed, sourced from
+      the live `likes`/`passes` tables via getSwipedUserIds().
+    - profile_views / recordView() NOT wired this pass — no view-quota UI exists
+      yet to consume it; revisit alongside that feature.
+  What changed:
+    - lib/shared/models/like.dart (NEW), match.dart (NEW): mirror the wire shape
+      from migration_002.md (Match includes MatchStatus enum + otherUserId()).
+    - lib/shared/data/swipe_repository.dart (NEW): SwipeRepository interface +
+      SupabaseSwipeRepository — likeProfile/passProfile/unlikeProfile/
+      getSwipedUserIds against `likes`/`passes`. Catches Postgres 23505 (already
+      swiped) as a typed AlreadySwipedException instead of letting a raw
+      PostgrestException surface to the UI.
+    - lib/shared/data/match_repository.dart (NEW): MatchRepository interface +
+      SupabaseMatchRepository — myMatches()/unmatch()/block() against `matches`,
+      plus subscribeToNewMatches() (realtime channel on postgres_changes insert,
+      filtered client-side to rows involving the current user).
+    - lib/shared/data/repositories.dart: SupabaseProfileRepository now takes
+      swipeRepository/matchRepository (defaulted) — discoverFeed() filters out
+      swiped ids; likedYou() queries `likes.to_user_id = me` then resolves
+      from_user_id → profiles via .inFilter(); matches() calls
+      MatchRepository.myMatches() then resolves the other participant →
+      profiles the same way. Added swipeRepositoryProvider/
+      matchRepositoryProvider; re-exports match/swipe types so screens only
+      import repositories.dart.
+    - lib/features/discover/discover_screen.dart: _pass/_like/_superLike now
+      call the real repository and catch AlreadySwipedException; removed
+      _showMatch() and the mock match-popup logic entirely.
+    - lib/features/likes/likes_screen.dart: LikesScreen converted from
+      ConsumerWidget to ConsumerStatefulWidget so it can own a RealtimeChannel
+      subscription (subscribe in initState, unsubscribe in dispose) — on a new
+      matches row it invalidates matchesProvider and shows the (moved-here)
+      "It's a Match!" dialog, resolving the other participant's profile via
+      profileByIdProvider.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` → **No issues found.**
+    - `flutter test` → **All tests passed** (2 — unchanged, auth-state only;
+      no new tests added since this needs a live Supabase connection to
+      exercise meaningfully).
+    - NOT driven on an emulator this session — recommend testing: like a profile
+      from two test accounts, confirm both `likes` rows appear in Supabase;
+      confirm liked/passed profiles drop out of the Discover deck on next load;
+      confirm Likes → Liked You tab shows accounts that liked you; confirm
+      unmatch/block PATCH calls succeed once a matches row exists (may need to
+      insert one manually via the dashboard until the trigger ships, since nothing
+      creates matches automatically yet).
+  Open items / follow-ups:
+    1. profile_views / recordView() — wire once a view-quota UI exists.
+    2. Once the mutual-like trigger ships server-side, re-verify the Likes
+       screen's realtime overlay actually fires end-to-end (untestable now —
+       nothing creates a matches row to react to).
+    3. Explore tab (byCountry) and the Discover feed's candidate composition
+       both remain mock — no discovery/geo/ranking tables yet.
+    4. unmatch()/block() are wired in MatchRepository but not yet surfaced in
+       any screen's UI (no "unmatch" button built) — add when that UX is spec'd.
+  Next: messages (once that migration lands), or wire the unmatch/block actions
+    into a Matches-tab long-press/menu using the now-available MatchRepository.
+
+[2026-07-04 18:51 IST] Dark Mode toggle (Settings → Appearance)
+  Scope: user asked for a working light/dark switch in Settings — front-end
+    preference feature, unrelated to the backend migration track.
+  What changed:
+    - pubspec.yaml: added shared_preferences ^2.3.3 (local persistence).
+    - lib/core/theme/theme_mode_controller.dart (NEW): ThemeModeController
+      (Notifier<ThemeMode>), persists the choice to SharedPreferences under
+      'app.theme_mode' ('light'/'dark'; unset → ThemeMode.system on first
+      launch). setDarkMode(bool) is the single mutator the UI calls.
+    - lib/app.dart: MaterialApp.router's `themeMode` now reads
+      ref.watch(themeModeProvider) instead of the hardcoded ThemeMode.system.
+    - lib/features/settings/settings_screen.dart: new "Appearance" section at
+      the top with a "Dark Mode" SwitchListTile. The switch's displayed value
+      resolves ThemeMode.system against the current platform brightness (via
+      MediaQuery.platformBrightnessOf) so it never looks wrong before the user
+      has made an explicit choice; toggling calls
+      themeModeProvider.notifier.setDarkMode(v), which flips the whole app's
+      theme immediately (AppTheme.light()/dark() already existed from Phase 1)
+      and persists it for next launch.
+  Result / verification (ALL GREEN):
+    - `flutter pub get` → OK (shared_preferences resolved).
+    - `flutter analyze` → **No issues found.**
+    - `flutter test` → **All tests passed** (2).
+    - Not driven on an emulator this session — manual check recommended: toggle
+      the switch, confirm colors flip app-wide instantly, kill and relaunch the
+      app, confirm the choice persisted.
+  Next: continue the backend integration track (see prior entry).
+
+
+2026-07-07 — BUGFIX: logged-in user routed to profile-setup on cold restart
+  What: On app restart a signed-in user was sent to the onboarding wizard
+    (04 Complete your profile) instead of Discover. Root cause: AuthController
+    .build() restored the persisted Supabase session but never loaded the
+    user's profiles.profile_complete flag, so it defaulted to false — the
+    router then saw signedIn && !profileComplete and forced onboarding. The
+    flag was only fetched on a fresh signIn(), never on session restore.
+  Fix (lib/features/auth/auth_controller.dart):
+    - Added AuthState.bootstrapped (false until the initial session-restore +
+      profile_complete fetch resolves).
+    - build() now kicks off _bootstrapSession(userId) to fetch profile_complete
+      for a restored session, then flips bootstrapped=true.
+    - Auth-state-change stream handling extracted to _onAuthEvent(): refetches
+      profile_complete on a genuinely new user id (OAuth / out-of-band session),
+      preserves it across routine token refreshes, and clears it on sign-out.
+    - signIn/signUp/signOut now also set bootstrapped=true.
+  Fix (lib/core/router/router_guards.dart): redirect() returns null (no
+    redirect) while !bootstrapped, so the guard can't force onboarding before
+    the real profile-complete state is known; router re-runs on the flip.
+  Result: flutter analyze on both files → No issues found. Behavior: logged-in
+    user → Discover; logged-out user → /auth. Not driven on emulator this
+    session — recommend a flutter run cold-restart walkthrough (login, kill,
+    relaunch → lands on Discover).
+[2026-07-07] BACKEND INTEGRATION â€” Phase 3: Chat & Calls module (migration_003.md)
+  Scope: wired against `005_chat.sql` + `006_chat_rls.sql` per
+    app doctumant/migration_003.md â€” conversations, messages, message_reads,
+    message_reactions, call_logs.
+  Key backend constraint carried into the client:
+    - The app still CANNOT create `conversations` rows. RLS allows only
+      SELECT/UPDATE on that table, and the migration doc explicitly says no
+      auto-create trigger exists yet. A match can only open chat after the
+      backend/dashboard inserts the conversation row. The UI now explains this
+      instead of navigating to a broken thread.
+  What changed:
+    - lib/shared/models/: rewrote conversation.dart and message.dart to mirror
+      the live schema; added message_reaction.dart, message_read.dart,
+      call_log.dart.
+    - lib/shared/data/conversation_repository.dart (NEW): loads active matches,
+      resolves partner profiles, computes unread counts from message_reads, and
+      builds last-message previews from messages because
+      conversations.last_message_id/last_message_at are not populated
+      server-side yet. Added realtime invalidation for inbox/call updates.
+    - lib/shared/data/message_repository.dart (NEW): live message history,
+      send/edit/soft-delete, markAsRead, reactions, per-conversation realtime.
+      Sender-only UPDATEs now verify the returned row set is non-empty, because
+      RLS can filter forbidden updates to 200 + [] instead of throwing.
+    - lib/shared/data/call_repository.dart (NEW): recent/per-thread call
+      history plus start/update/end methods for call_logs.
+    - lib/shared/data/repositories.dart: conversation/message providers now
+      point at the live Supabase repositories; added conversationByIdProvider,
+      conversationByPartnerProvider, recentCallsProvider.
+    - lib/features/messages/messages_screen.dart: Chats tab now reads live
+      conversations; Calls tab now reads live call_logs; inbox realtime refreshes both.
+    - lib/features/chat/chat_screen.dart: route now takes a conversation id,
+      loads real message history, marks incoming messages read, sends real text
+      messages, toggles reactions, and can show per-thread call history.
+    - lib/core/router/chat_navigation.dart (NEW) + call-site updates in
+      Discover / Explore / Likes / Notifications: when only a partner id is
+      known, the app resolves the existing conversation first and shows a
+      snackbar if the backend has not created one yet.
+    - lib/shared/data/mock_data.dart updated to the new message/conversation
+      constructors so the remaining mock-backed areas still compile cleanly.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` â†’ **No issues found.**
+    - `flutter test` â†’ **All tests passed** (2).
+    - Not driven on an emulator this session. Recommended live walkthrough:
+      open Messages with an account that already has conversation rows, send a
+      text message, verify read receipts + reactions, verify Calls tab renders
+      call_logs, and confirm "Message" from a match without a conversation row
+      shows the explanatory snackbar.
+  Deferred / still blocked by backend:
+    1. conversation auto-create trigger when a match forms.
+    2. last_message_id / last_message_at population trigger.
+    3. storage/upload path for image/video/audio/gif/sticker messages.
+    4. location-message coordinates.
+    5. actual call UX/WebRTC flow (call_logs are wired; live calling UI is not).
+
+[2026-07-08] NOTE - repo reset to last pushed commit, then Phase 3 rebuilt
+  Context: the working tree was reset (git restore + git clean) back to the
+    single `ebb4cb7 first commit` at the user's request, discarding all
+    uncommitted work at the time - including whatever produced the entry above
+    ("BACKEND INTEGRATION - Phase 3: Chat & Calls module") and its
+    message_repository.dart / chat_navigation.dart / per-screen "message"
+    call-site rewiring. None of those files exist in `ebb4cb7`, so that
+    session's chat work was never committed and is gone. The entry above is
+    now STALE - it describes files/behavior not present on disk. Treat the
+    entry below as the current state of the chat/calls integration instead.
+
+[2026-07-08] BACKEND INTEGRATION - Phase 3: Chat & Calls module (migration_003.md) (BUILT, analyze+tests green)
+  Scope: wired against `005_chat.sql` + `006_chat_rls.sql` per
+    app doctumant/migration_003.md - conversations, messages, message_reads,
+    message_reactions, call_logs.
+  Blocking constraint (flagged, not worked around): `conversations` has NO
+    INSERT policy and no trigger yet auto-creates one when a match forms. The
+    client cannot create a conversation for a new match - chat only works for
+    conversations backend has already inserted out-of-band. The Chat screen
+    shows an explicit "chat isn't available for this match yet" empty state
+    instead of erroring or pretending to work.
+  What changed:
+    - lib/shared/models/: rewrote conversation.dart (id/matchId/lastMessageId/
+      lastMessageAt - was partnerId-keyed mock shape) and message.dart
+      (ChatMessage: conversationId/senderId/messageType enum/status enum/
+      isEdited/isDeleted - was a flat text-only mock shape). Added
+      message_read.dart, message_reaction.dart, call_log.dart (CallType/
+      CallStatus enums) mirroring the live wire shape exactly.
+    - lib/shared/data/chat_repository.dart (NEW): ChatRepository +
+      SupabaseChatRepository - getMessages/sendTextMessage/sendMediaMessage/
+      editMessage/deleteMessage(soft)/markAsRead/addReaction/removeReaction/
+      subscribeToMessages(realtime). Maps Postgres 23514 (message-shape
+      constraint violation) to a typed MessageConstraintException; maps 23505
+      (already read / already reacted) to a silent no-op per the doc.
+    - lib/shared/data/call_repository.dart (NEW): CallRepository +
+      SupabaseCallRepository - startCall/updateCallStatus/endCall(always sends
+      ended_at+ended_by together per the DB constraint)/getCallHistory.
+    - lib/shared/data/conversation_repository.dart (NEW): ConversationRepository
+      + SupabaseConversationRepository. conversationsForMe() joins the current
+      user's active matches -> conversations (by match_id) -> the other
+      participant's profile, and previews the latest message by querying
+      `messages` directly (conversations.last_message_id/at are not populated
+      server-side yet, per the doc). forPartner(userId) resolves match ->
+      conversation and returns null if none exists - the seam the Chat screen
+      uses to detect "not available yet".
+    - lib/shared/data/repositories.dart: dropped the old mock
+      ConversationRepository/MessageRepository interfaces entirely (shape
+      changed too much to adapt at the boundary); added chatRepositoryProvider/
+      callRepositoryProvider; conversationsProvider now returns
+      List<ConversationSummary>; added conversationForPartnerProvider; re-keyed
+      messagesProvider family from partnerId to conversationId.
+    - lib/shared/data/mock_data.dart: removed the mock `conversations` and
+      `messages` blocks (dead weight now that both are fully live-backed).
+    - lib/features/messages/messages_screen.dart: Chats tab renders
+      ConversationSummary (partner profile + live last-message preview);
+      dropped "Mark as read"/"Mute" long-press actions (no unreadCount/isMuted
+      column exists yet to back them - was previously fully mock).
+    - lib/features/chat/chat_screen.dart: resolves the conversation for
+      widget.partnerId via conversationForPartnerProvider first; shows the
+      "not available yet" EmptyView when null; otherwise loads real message
+      history, subscribes to per-conversation realtime inserts (de-duped by
+      message id against the locally-sent copy), sends real text messages,
+      and reactions go through addReaction(). Call buttons still show a
+      "coming soon" toast - call_logs plumbing exists in CallRepository but no
+      screen calls it yet (no WebRTC/calling UI in this pass).
+    - Did NOT touch Discover/Explore/Likes/Notifications chat-navigation call
+      sites - they already just do context.push(RoutePaths.chatTo(userId)),
+      and the Chat screen itself now handles the "no conversation yet" case,
+      so no pre-navigation snackbar-intercept layer was added.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` -> **No issues found** (2 pre-existing info-level
+      lint suggestions in chat_repository.dart are false positives - the
+      null-aware `?` suggestion doesn't apply to conditionally-included map
+      entries - left as-is).
+    - `flutter test` -> **All tests passed** (2, unchanged - auth-state only).
+    - NOT driven on an emulator this session. Recommended live walkthrough:
+      have backend manually insert a `conversations` row for a real match
+      between two test accounts, then send a text message from each side,
+      confirm realtime delivery, confirm a reaction persists, and confirm
+      messaging a match WITHOUT a conversation row shows the empty state
+      cleanly instead of crashing.
+  Deferred / still blocked by backend:
+    1. conversations auto-create trigger when a match forms (the hard blocker).
+    2. last_message_id / last_message_at population trigger.
+    3. Storage buckets for media messages - media_url/thumbnail_url have no
+       upload pipeline wired up (no bucket exists yet per the doc).
+    4. location-message coordinates (no lat/lng columns exist).
+    5. Actual call UX/WebRTC - CallRepository is wired but no screen invokes
+       startCall/endCall yet.
+    6. Read-receipt UI beyond the sender's own single/double-check - no
+       per-user read list is surfaced (message_reads rows aren't queried for
+       "seen by" in any screen yet).
+
+[2026-07-07] Android build fix â€” moved Gradle/Android redirected build output
+  What happened: `flutter build apk --release` failed inside
+    `:shared_preferences_android:mergeReleaseResources` because Windows reported
+    `build/shared_preferences_android/.../multi-v2` as corrupted/unreadable.
+    The stale `build/` tree could be listed at the parent level but not fully
+    enumerated or deleted, so standard clean-up could not recover it.
+  What changed:
+    - android/build.gradle.kts: changed the repo-level redirected Android build
+      output from `../../build` to `../../build_android`, forcing Gradle to use
+      a fresh workspace build tree instead of the corrupted one.
+  Why: avoid the broken Windows directory state without touching app/runtime code.
+  Follow-up:
+    - The first escalated release-build retry got past the unreadable
+      `shared_preferences_android` resource folder, but then failed in Kotlin's
+      incremental cache layer because plugin sources live on `C:` (Pub cache)
+      while the project lives on `D:`. Kotlin tried to relativize files across
+      different drive roots and crashed while closing caches for
+      `shared_preferences_android` and `url_launcher_android`.
+    - android/gradle.properties: added `kotlin.incremental=false` to disable
+      that cross-drive incremental cache path on Windows.
+    - With the temporary `build_android` redirect in place, Gradle produced a
+      valid APK at `build_android/app/outputs/flutter-apk/app-release.apk`, but
+      `flutter build` still exited non-zero because the Flutter tool only looks
+      for the final artifact under the default `build/` path.
+  Final fix:
+    - Restored android/build.gradle.kts to the default redirected output path
+      (`../build`) once the bad tree was out of the way.
+    - Windows shell rename succeeded where deletion did not:
+      `build` â†’ `build_bad` (quarantines the corrupted old tree so Flutter can
+      recreate a fresh default `build/` directory).
+    - Removed the temporary `build_android/` workaround folder after the final
+      successful build.
+  Result / verification (GREEN):
+    - `flutter build apk --release` â†’ **SUCCESS**
+    - Output: `build/app/outputs/flutter-apk/app-release.apk` (58.6 MB,
+      2026-07-07 19:29 local time).
+  Follow-up:
+    - `build_bad/` is the old corrupted folder. It is no longer used, but if
+      Windows later refuses to remove it, run a disk check / filesystem repair
+      on that drive before deleting it.
+
+[2026-07-08] BACKEND INTEGRATION - Phase 4: Notifications module (migration_004.md) (BUILT, analyze+tests green)
+  Scope: wired against the live `notifications` + `notification_preferences`
+    tables per app doctumant/migration_004.md. `notification_queue` is
+    explicitly off-limits to Flutter (service-role/Edge Function only) - no
+    code touches it. Backend status per the doc: schema + RLS complete, but
+    push dispatch/Edge Functions/Firebase delivery/realtime are NOT built yet.
+  Key constraints carried into the client:
+    - The app CANNOT create `notifications` rows (no INSERT policy) - only
+      fetch/mark-read/delete. Notifications are generated by future backend
+      logic only.
+    - No realtime yet (doc is explicit: "Flutter should refresh manually") -
+      the feed uses pull-to-refresh + provider invalidation, not a live
+      subscription, unlike matches/messages in migrations 2-3.
+  What changed:
+    - lib/shared/models/app_notification.dart (REWRITTEN): NotificationType
+      now has the real 11 values (newLike/newMatch/newMessage/callIncoming/
+      callMissed/profileView/profileVerified/subscriptionExpiring/
+      subscriptionActive/reportUpdate/system) instead of the old 7-value mock
+      enum: added actorUserId + a `data` jsonb payload (Map<String,dynamic>)
+      for deep-linking, replacing the old flat relatedUserId shortcut.
+    - lib/shared/models/notification_preferences.dart (NEW): mirrors
+      notification_preferences exactly (push_enabled/email_enabled +
+      6 per-category toggles).
+    - lib/shared/data/notification_repository.dart (NEW): NotificationRepository
+      + SupabaseNotificationRepository - notifications()/markAsRead()/delete()
+      against `notifications`; getPreferences()/updatePreferences()/
+      createDefaultPreferences() against `notification_preferences`.
+    - lib/features/auth/auth_controller.dart: signUp() now also inserts the
+      default `notification_preferences` row right after the `profiles`
+      insert, per the doc's "run only once after signup" instruction.
+    - lib/shared/data/repositories.dart: dropped the old mock
+      NotificationRepository interface/impl entirely (shape changed too much
+      to adapt at the boundary, same pattern as migrations 2-3);
+      notificationRepositoryProvider now points at
+      SupabaseNotificationRepository.
+    - lib/shared/data/mock_data.dart: removed the mock `notifications` list
+      (dead weight - fully live-backed now).
+    - lib/features/notifications/notifications_screen.dart (REWORKED):
+      icon-per-type mapping updated for the 11 real types; swipe-to-delete
+      calls the real delete(); tap calls real markAsRead() before
+      deep-linking; "Mark all read" iterates unread items and calls
+      markAsRead() for each (no bulk-update endpoint exists); pull-to-refresh
+      added since there's no realtime to lean on.
+    - Deep-linking uses `type` (not the old relatedUserId): newLike -> Likes
+      tab; newMatch/newMessage/callIncoming/callMissed -> Messages tab
+      (newMatch/newMessage carry a `conversation_id` in `data`, not a partner
+      user id, and the chat route is keyed by partner id - routing to the
+      Messages list avoids guessing at a lookup that doesn't exist yet);
+      profileView/profileVerified -> Profile; subscription* -> Subscription;
+      reportUpdate -> Safety Reports; system -> no-op.
+  Explicitly deferred (per user decision this session):
+    - Settings screen's Notifications section (Push/Email/Sound/Vibration
+      toggles) was left untouched/still mock - Sound/Vibration have no
+      backing column anywhere, and wiring the real 8-field
+      notification_preferences UI is its own pass, not bundled into this one.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` -> **No issues found** (same 2 pre-existing
+      info-level false-positive lints in chat_repository.dart from the
+      migration 3 session, unrelated to this change).
+    - `flutter test` -> **All tests passed** (2, unchanged - auth-state only).
+    - NOT driven on an emulator this session - needs backend to have actually
+      inserted at least one notifications row for a test account (client
+      can't create them) to verify the feed/mark-read/delete/deep-link paths
+      end-to-end.
+  Deferred / still blocked by backend (per the doc's own checklist):
+    1. Push notifications (Firebase Cloud Messaging) - not built server-side.
+    2. Edge Functions / notification dispatcher - not built.
+    3. Realtime notification stream - not implemented; manual refresh only.
+    4. Wiring the real notification_preferences toggles into Settings UI.
+
+[2026-07-08] BACKEND INTEGRATION - Phase 5: Profile Photos module (migration_005,006,007.md) (BUILT, analyze+tests green)
+  Scope: wired against `009_profile_photos.sql` + `010_profile_photos_rls.sql`
+    (table + RLS), the `sync_primary_profile_photo` trigger from
+    `011_triggers_core.sql`/`012_triggers_core_fixes.sql`, and the
+    `set_primary_profile_photo` RPC from `013_rpc_functions.sql`.
+  Doc caveat carried into this work: this guide was verified by static trace
+    through the migration SQL, NOT against a live database (unlike migrations
+    2/3's live-tested docs) - so the upload -> set-primary -> discover-feed
+    flow should get a real smoke test against the live project before
+    shipping, per the doc's own recommendation.
+  Key gap, worked around deliberately (user decision this session): there is
+    still no storage bucket / upload pipeline anywhere in the backend -
+    `photo_url` has no real image source. Rather than leave all photo UI
+    mock, wired the FULL repository (list/add/setPrimary/delete) against the
+    live table + RPC, and used clearly-labeled placeholder picsum.photos URLs
+    as the write-path stand-in for a real image picker/upload. This exercises
+    the entire read/write/set-primary/delete flow end-to-end against
+    Supabase - only the actual image source is fake.
+  What changed:
+    - lib/shared/models/profile_photo.dart (NEW): ProfilePhoto mirrors
+      profile_photos exactly (id/userId/photoUrl/displayOrder/isPrimary/
+      timestamps).
+    - lib/shared/data/profile_photo_repository.dart (NEW):
+      ProfilePhotoRepository + SupabaseProfilePhotoRepository - myPhotos()/
+      addPhoto()/setPrimary() (calls the `set_primary_profile_photo` RPC)/
+      deletePhoto(). Maps Postgres 23505 (display_order slot taken, or a rare
+      concurrent-primary race) to ProfilePhotoSlotTakenException and 23514
+      (empty photo_url / display_order outside 1-4) to
+      ProfilePhotoConstraintException, instead of raw PostgrestException.
+    - lib/shared/data/repositories.dart: added profilePhotoRepositoryProvider
+      + myPhotosProvider (FutureProvider); re-exports profile_photo_repository.dart.
+    - lib/features/profile/profile_screen.dart: gallery section rewritten to
+      a provider-driven grid over real profile_photos rows - tap a non-primary
+      photo to call setPrimary() (RPC), long-press to delete, tap the "+"
+      tile (shown while under the 4-photo cap) to addPhoto() with a
+      placeholder URL at the next free display_order slot. Successful
+      add/setPrimary/delete on the primary photo invalidates
+      currentUserProvider too, since profiles.photo_url is kept in sync by
+      the DB trigger and the UI needs to pick that up.
+    - lib/features/onboarding/profile_setup_screen.dart: the avatar step
+      (Step 2) now inserts a REAL profile_photos row (display_order: 1,
+      is_primary: true) via a placeholder URL when tapped, instead of just
+      flipping a local bool - the sync_primary_profile_photo trigger mirrors
+      it onto profiles.photo_url automatically, which is why Discover/Likes/
+      Matches (all read profiles.photo_url) will show it without extra
+      wiring. Tapping again just clears the local "added" flag (does not
+      delete the row - matches the original mock UX of a toggle). Local
+      _maxProfilePhotos = 4 constant replaces the AppConstants.maxGalleryPhotos
+      (=6) figure for this screen's slot math, since 4 is the actual DB
+      constraint (`display_order` range 1-4), not the front-end constant.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` -> **No issues found** (same 2 pre-existing
+      info-level false-positive lints in chat_repository.dart, unrelated).
+    - `flutter test` -> **All tests passed** (2, unchanged - auth-state only).
+    - NOT driven on an emulator this session. Per the doc's own verification
+      caveat (static trace, not live-tested), this module specifically
+      deserves a real walkthrough before shipping: add an avatar during
+      onboarding -> confirm profiles.photo_url updates -> add 3 more gallery
+      photos -> tap a non-primary photo -> confirm it becomes primary and
+      profiles.photo_url follows -> delete a photo -> confirm the grid updates.
+  Deferred / still blocked by backend (per the doc's own checklist):
+    1. No storage bucket / upload pipeline - real image picker/upload is a
+       separate pass once a bucket exists (same gap as chat media).
+    2. No RPC for adding a photo or reordering display_order - direct table
+       access under RLS is the only path today (used as-is).
+    3. No auto-promotion of a new primary photo when the current primary is
+       deleted - after deleting the primary, profiles.photo_url keeps its
+       last-synced value until the user picks a new primary. UI does not yet
+       have special handling for "zero primary photos" beyond just showing
+       whatever profiles.photo_url last was.
+    4. AppConstants.maxGalleryPhotos (=6) was left as-is (unused by this
+       screen now) rather than changed to 4, since it may be intentional
+       front-end-only scope for a future non-profile_photos gallery feature -
+       flagged for the user to reconcile if it turns out to be dead.
+
+[2026-07-08] FRONT-END: Real profile-photo capture + upload + on-device human-face validation
+  Goal (user request): let users take/choose a real profile photo (camera or
+    gallery) instead of the placeholder picsum URLs, and REJECT any photo that
+    isn't a picture of a person ("not a human picture" error) before upload.
+  Decisions confirmed with user:
+    - Validation: on-device ML Kit face detection now (fast, offline, first
+      gate). The authoritative server-side `moderate-image` check is still the
+      intended final gate but isn't built (BACKEND_REMAINING.md [BE-5]).
+    - Enforce human-face check on PROFILE photos only (onboarding avatar +
+      profile gallery/avatar), NOT chat images.
+    - Real upload to a Supabase Storage `avatars` bucket (user will create it).
+    - Added image_picker + google_mlkit_face_detection now (native deps).
+  Packages added (pubspec.yaml):
+    - image_picker: ^1.1.2
+    - google_mlkit_face_detection: ^0.13.1  (resolved 0.13.2)
+  What changed:
+    - lib/core/media/photo_picker_service.dart (NEW): PhotoPickerService —
+      pickProfilePhoto(camera|gallery) via image_picker (quality 85, max
+      1440px), then runs ML Kit FaceDetector on the file; throws
+      NoFaceDetectedException if zero faces, PhotoPickCancelled if the user
+      backs out. Returns PickedPhoto{bytes, fileExtension}. Exposes
+      photoPickerServiceProvider (Riverpod Provider that closes the detector
+      on dispose).
+    - lib/core/media/photo_source_sheet.dart (NEW): showPhotoSourceSheet() —
+      shared "Take Photo / Choose from Gallery" bottom sheet returning a
+      PhotoSource.
+    - lib/shared/data/profile_photo_repository.dart: added
+      uploadPhoto(bytes, fileExtension) — uploads to the `avatars` bucket at
+      `<user_id>/<uuid>.<ext>` (contentType by ext, upsert) and returns the
+      public URL; added `const kAvatarsBucket = 'avatars'`. addPhoto() still
+      just inserts the profile_photos row with whatever URL it's given.
+    - lib/features/onboarding/profile_setup_screen.dart: avatar step's
+      _toggleAvatar() replaced with _pickAvatar() — source sheet -> pick +
+      face-validate -> upload -> addPhoto(displayOrder:1, isPrimary:true).
+      Shows the "not a photo of a person" error on NoFaceDetectedException.
+      (The extra mock gallery-slot bools in step 2 were left as-is — the
+      required avatar is the real one; multi-add is covered on the Profile
+      screen.)
+    - lib/features/profile/profile_screen.dart: _addPhoto() (the gallery "+"
+      tile) now does source sheet -> pick + face-validate -> upload ->
+      addPhoto() at the next free slot. NEW _changeAvatar() wired to the
+      banner avatar's camera badge (previously decorative) — pick +
+      face-validate -> upload -> make primary; if the gallery is full (4) it
+      replaces the current primary's slot. Both surface the human-face error.
+    - android/app/src/main/AndroidManifest.xml: added CAMERA permission +
+      optional camera uses-feature, and the ML Kit
+      `com.google.mlkit.vision.DEPENDENCIES = face` meta-data so the model
+      pre-downloads on install. (Gallery uses the Android Photo Picker — no
+      storage permission needed.)
+  ⚠️ REQUIRED USER ACTION before this works on-device:
+    Create a Supabase Storage bucket named exactly `avatars`, PUBLIC (so the
+    public URL renders in Discover/Likes/Matches which read profiles.photo_url).
+    Suggested policies: public read; authenticated users can insert/update/
+    delete objects under their own `<user_id>/` prefix. Without the bucket,
+    uploadPhoto() will fail with a bucket-not-found error and the UI shows
+    "Could not add photo — try again."
+  Result / verification:
+    - `flutter analyze` -> No issues found (2 pre-existing false-positive
+      lints only). `flutter test` -> All tests passed (2).
+    - NOT run on a device this session — face detection + camera/gallery +
+      real upload need a physical device/emulator + the `avatars` bucket to
+      exercise. Recommend: onboarding -> take a selfie -> confirm it uploads
+      and profiles.photo_url updates; try a non-person photo -> confirm the
+      rejection message; add gallery photos on Profile; tap the avatar badge
+      to swap the primary.
+  Deferred:
+    - iOS Info.plist usage strings (NSCameraUsageDescription /
+      NSPhotoLibraryUsageDescription) not added — Android is the current
+      target; add before any iOS build.
+    - Server-side moderate-image human/NSFW gate — [BE-5], still the real
+      authoritative check.
+    - Chat media/voice picking (locations 5-6 in FRONTEND_REMAINING.md §4.2)
+      not touched this pass — profile photos only, per scope.
+    - Onboarding step-2 extra gallery slots still mock bools.
+
+[2026-07-09] FRONT-END: Photo/video/voice upload extended to all screen-backed spots
+  Goal (user request): finish the media-upload feature everywhere a screen
+    exists today — onboarding gallery + chat image/video/voice — uploading to
+    the real Supabase Storage buckets. (Face-check on PROFILE photos only, per
+    earlier decision; chat media is not required to be a person.)
+  Scope confirmed with user: complete #2 (onboarding gallery), #5 (chat
+    image/video), #6 (chat voice). #1/#3/#4 (profile photos) already done last
+    pass. Skipped #7 (live WebRTC calls — not an upload) and #8/#9/#10 (ID
+    verification / Wise receipt / video profile — need brand-new screens).
+  Packages added (pubspec.yaml): record ^5.1.2 (voice), video_thumbnail ^0.5.3
+    (video poster frame — messages.video requires a thumbnail_url),
+    path_provider ^2.1.4 (temp files for recording).
+  What changed:
+    - lib/core/media/photo_picker_service.dart: added PickedChatMedia
+      (image|video, +thumbnailBytes for video), RecordedVoice, and
+      pickChatImage()/pickChatVideo() — NO face-check (chat images can be
+      anything). pickChatVideo generates a JPEG thumbnail via video_thumbnail.
+      _extensionOf now takes a fallback (mp4 for videos).
+    - lib/core/media/voice_recorder_service.dart (NEW): VoiceRecorderService —
+      start()/stop()/cancel() wrapping the `record` recorder (AAC/m4a to a
+      temp file, returns bytes). voiceRecorderServiceProvider disposes it.
+    - lib/shared/data/chat_repository.dart: added uploadChatImage /
+      uploadChatVideo (media + thumbnail) / uploadVoice — upload to the
+      PRIVATE chat buckets and return 7-day SIGNED URLs (chat buckets are
+      private per the backend spec, unlike the public avatars bucket).
+      Bucket-name consts: chat-images, chat-files (video), chat-file-thumbs,
+      voice-messages. Paths keyed by `<conversation_id>/<uuid>.<ext>`.
+    - lib/features/onboarding/profile_setup_screen.dart: step-2 gallery is now
+      REAL — replaced the mock `_gallery` bools with `_galleryUrls`; each slot
+      (fill-in-order) picks + face-validates + uploads + inserts a non-primary
+      profile_photos row at the next display_order (avatar=slot1). Avatar state
+      switched from a bool to `_avatarUrl`. Renders uploaded thumbnails via
+      Image.network.
+    - lib/features/chat/chat_screen.dart: attach paperclip now opens
+      Photo/Video -> source sheet -> pick -> upload -> sendMediaMessage. Mic
+      button now records (tap=start, tap-again=stop+send) with a "Recording…
+      tap to send" composer state and a spinner while uploading. Bubbles now
+      render media: image (CachedNetworkImage), video (thumbnail + play badge),
+      audio ("Voice message" row); text falls back as before. Video guarded to
+      require a generated thumbnail before sending (DB constraint).
+    - android/app/src/main/AndroidManifest.xml: added RECORD_AUDIO permission
+      + optional microphone feature (camera perms already present).
+  ⚠️ REQUIRED USER ACTION — create FOUR more Supabase Storage buckets (in
+    addition to the public `avatars` bucket from last pass), all PRIVATE:
+      chat-images, chat-files, chat-file-thumbs, voice-messages
+    Policies: a conversation participant can insert objects under a
+    `<conversation_id>/` path; reads happen via signed URLs the client mints
+    (createSignedUrl). Without these buckets, sending chat media fails with a
+    bucket-not-found error and the UI shows "Could not send — try again."
+  Result / verification:
+    - `flutter analyze` -> No issues found (2 pre-existing false-positive
+      info lints only). `flutter test` -> All tests passed (2).
+    - NOT run on a device — camera/gallery/mic/video-thumbnail + real uploads
+      + the buckets are needed to exercise. Recommend on-device: onboarding
+      add 2-3 gallery photos; in a chat that has a conversation row, send a
+      photo, a video (confirm thumbnail + play badge), and a voice note.
+  Deferred (still not media-upload-wired):
+    - Chat emoji picker button (not media; left as-is).
+    - #8 video profile, #9 ID/selfie verification, #10 Wise receipt — need new
+      screens + backend endpoints/buckets that don't exist yet.
+    - iOS Info.plist usage strings (NSCamera/NSPhotoLibrary/NSMicrophone) —
+      add before any iOS build.
+    - Server-side moderate-image NSFW/human gate — [BE-5], still the real
+      authoritative check for all image uploads.
+
+[2026-07-09] BUILD FIX (record pkg) + real upload-error surfacing + backend media spec
+  1) Android build was failing at kernel_snapshot_program:
+       record_linux 0.7.2 doesn't implement record_platform_interface 1.6.0
+       (missing startStream; hasPermission signature mismatch).
+     Even though record_linux is Linux-only and irrelevant to Android, Flutter
+     compiles the whole dep graph, so it broke the build.
+     FIX: bumped `record: ^5.1.2` -> `^7.1.1` in pubspec.yaml, which resolves a
+     consistent set (record_linux 2.1.1 + record_platform_interface 2.1.0).
+     VoiceRecorderService needed no code change (API compatible).
+     Verified: `flutter build apk --debug` -> SUCCESS.
+  2) Root-caused the on-device "Could not add photo — try again." error.
+     Device log showed FaceDetectorV2Jni start/end (pick + ML Kit face check
+     BOTH worked, face found) — the failure was in the upload step.
+     Probed the live project directly:
+       GET  /storage/v1/bucket                 -> []   (ZERO buckets exist)
+       POST /storage/v1/object/avatars/<path>  -> {"statusCode":"404",
+                                                   "error":"Bucket not found"}
+     So: no Storage buckets have been created in the Supabase project at all.
+     (Note: the storage `list` endpoint returns [] for a nonexistent bucket
+     rather than 404 — misleading. The upload probe is the reliable check.)
+  3) MY BUG, fixed: every media catch block was `catch (_)` and swallowed the
+     real error, so the UI only ever said "try again" and the true cause was
+     invisible. Added:
+       - lib/shared/data/profile_photo_repository.dart: MediaUploadException
+         (message + isMissingBucket) and mapStorageError(error, bucket) which
+         maps StorageException 404/"bucket" -> "Storage bucket "X" does not
+         exist. Create it in the Supabase dashboard.", 403/RLS -> a policy
+         message, else "Upload failed: <msg>".
+       - uploadPhoto() and ChatRepository._uploadPrivate() now wrap the
+         uploadBinary/createSignedUrl calls and throw MediaUploadException.
+       - All 5 UI call sites (onboarding avatar + gallery, profile add +
+         change-avatar, chat attach + voice) now catch MediaUploadException
+         and show e.message; generic catches now interpolate the real error
+         instead of discarding it.
+  4) NEW DOC for the backend team:
+       app doctumant/BACKEND_MEDIA_REQUIREMENTS.md
+     Complete hand-off spec for the media/image system: the 5 exact bucket
+     names + public/private, copy-paste Storage RLS SQL (incl. an
+     is_conversation_participant() SECURITY DEFINER helper), the exact client
+     upload contract (paths, MIME types, compression caps, signed-URL TTL),
+     the DB constraints we rely on, a requested `moderate-image` edge-function
+     contract (safe/isHuman/categories, profile-vs-chat rules, and a strong
+     recommendation to run it as a storage webhook rather than client-invoked
+     so it can't be bypassed), the conversations-auto-create blocker, an error
+     contract, an acceptance checklist, and 7 open questions (signed-URL
+     expiry strategy, primary-photo auto-promotion, max photo count 4 vs 6,
+     chat-files-vs-chat-videos naming, location lat/lng, etc.).
+  Verified: `flutter analyze` -> No issues found (2 pre-existing false-positive
+    info lints). `flutter test` -> All tests passed (2).
+  STILL BLOCKED on the user/backend creating the 5 buckets + policies; until
+    then every upload fails, but now with an accurate on-screen reason.
+
+[2026-07-09] GROUP A — wire up already-built repository code that no UI called
+  Scope: the 8 "quick win" items from FRONTEND_REMAINING.md that needed zero
+    new backend — the repository methods existed but nothing invoked them.
+    7 of 8 done; 1 turned out to be blocked (see A6).
+
+  PRE-FLIGHT CHECK (important): probed the live project before starting, since
+    an earlier summary of mine had claimed `reports` was live. It is NOT:
+      reports                 -> HTTP 404   (DOES NOT EXIST)
+      profile_views           -> HTTP 200
+      likes / matches         -> HTTP 200
+      call_logs               -> HTTP 200
+      message_reactions       -> HTTP 200
+      notification_preferences-> HTTP 200
+    So A6 was dropped, and A7's "Views" stat had to change (see below).
+
+  A1 — Chat read receipts (DONE)
+    - chat_repository.dart: added markManyAsRead(ids) — a single upsert into
+      `message_reads` with onConflict:'message_id,user_id', ignoreDuplicates,
+      instead of N round-trips.
+    - chat_screen.dart: new _markIncomingRead(convoId) marks every message
+      from the other participant read. Called (a) once after the initial
+      history load (post-frame), and (b) on every realtime inbound message.
+      A `_markedRead` Set de-dupes within the session; on failure the ids are
+      removed from it so a later attempt can retry.
+    - Effect: the other side's single-check now actually becomes a double-check.
+
+  A2 — Chat reactions are now VISIBLE (DONE)
+    - Previously write-only: addReaction() was called on long-press but the
+      app never read `message_reactions` back, so reactions never appeared.
+    - chat_repository.dart: added reactionsFor(messageIds) (inFilter query).
+    - repositories.dart: new reactionsProvider(conversationId) which depends on
+      messagesProvider and fetches reactions for the loaded message ids.
+    - chat_screen.dart: bubbles are now wrapped in a Column with reaction chips
+      underneath. Chips group by emoji with a count ("❤️ 3"); a chip you
+      contributed to is outlined in pink and tapping it calls removeReaction()
+      (which existed and had never been called from anywhere).
+    - profile_tile.dart: added an `onLongPress` param (needed by A4 too).
+
+  A3 — Calls tab renders real call_logs (DONE)
+    - Was a hardcoded EmptyView("No calls yet.") that read nothing, while
+      CallRepository.getCallHistory() sat unused.
+    - repositories.dart: new callHistoryProvider — fans out getCallHistory()
+      across every conversation, merges, sorts by started_at desc.
+    - messages_screen.dart: real _callsTab() with per-row direction icon
+      (outgoing/incoming/missed), audio-vs-video icon, duration ("2m 14s") or
+      status, partner avatar+name resolved from conversationsProvider, relative
+      timestamp, pull-to-refresh, and loading/empty/error states.
+    - Rows are read-only — placing a call still needs WebRTC (not built).
+
+  A4 — Unmatch / Block now reachable (DONE)
+    - MatchRepository.unmatch()/block() existed with no UI entry point.
+    - repositories.dart: new myMatchRowsProvider — matchesProvider only exposes
+      the partner's Profile, but unmatch/block key off the match id, so the raw
+      `matches` rows are needed to resolve profile -> match.
+    - likes_screen.dart (Matches tab): long-press a match -> action sheet
+      (Unmatch / Block) -> typed confirmation dialog -> repository call ->
+      invalidates matchesProvider + myMatchRowsProvider + conversationsProvider.
+      Both are soft status UPDATEs; the row is never deleted.
+
+  A5 — Settings notification toggles are REAL (DONE)
+    - getPreferences()/updatePreferences() existed, never called. The section
+      was 4 fake setState switches.
+    - repositories.dart: new notificationPreferencesProvider.
+    - settings_screen.dart: replaced with the actual 8 columns of
+      `notification_preferences` — push_enabled, email_enabled, and the 6
+      per-category toggles (likes/matches/messages/calls/profile views/
+      marketing). Each flip PATCHes immediately; the provider is invalidated
+      afterwards either way so the switches always reflect the server rather
+      than an optimistic guess. Loading/error(+retry) states added.
+    - REMOVED "Sound" and "Vibration": they have **no backing column anywhere**
+      in the schema. They were pure decoration. Deleting them beats shipping
+      switches that persist nothing.
+
+  A6 — Safety Reports: **BLOCKED, NOT DONE**
+    - I had listed this as a quick win on the claim that `reports` was live.
+      That was wrong — it was based on the full backend spec, not the delivered
+      migrations. `GET /rest/v1/reports` returns 404; the table does not exist.
+    - Left reading MockData. Cannot be done until backend ships the table
+      (BACKEND_REMAINING.md [BE-5]).
+
+  A7 — Profile stats (PARTIALLY REAL — deliberately)
+    - repositories.dart: ProfileStats type + ProfileRepository.myStats().
+      Supabase impl counts with head-count queries:
+        likes   = count(likes where to_user_id = me)
+        matches = count(matches where me is a participant and status='active')
+    - **Views is NOT obtainable.** `profile_views` RLS only exposes rows for
+      views *you made*, not views *of you* — "who viewed me" needs a premium
+      RPC that doesn't exist (migration_002.md §5). Rather than keep the fake
+      128, the Views stat now renders "–". An honest dash beats a lie.
+    - profile_screen.dart: stats row driven by the new myStatsProvider;
+      MockData import dropped entirely from this screen.
+
+  A8 — Edit Profile actually saves (DONE)
+    - The sheet built throwaway TextEditingControllers and the Save button just
+      called Navigator.pop() — it persisted nothing.
+    - repositories.dart: ProfileRepository.updateMyProfile({name}) -> PATCH
+      `profiles`.
+    - profile_screen.dart: extracted a real _EditProfileSheet
+      (ConsumerStatefulWidget) with a persistent controller, name validation
+      (Validators.displayName), a saving spinner, inline error text, and
+      currentUserProvider invalidation on success.
+    - **REMOVED the Bio field**: there is no `bio` column in the live schema
+      (it's a local-only field on Profile). It was a text box that silently
+      discarded whatever the user typed. Restore when [BE-13] ships the column.
+
+  Result / verification (ALL GREEN):
+    - `flutter analyze` -> No issues found (2 pre-existing false-positive
+      use_null_aware_elements info lints in chat_repository only).
+    - `flutter test` -> All tests passed (2).
+    - `flutter build apk --debug` -> SUCCESS.
+    - NOT exercised on-device: read receipts/reactions/calls need a live
+      conversation row (blocked by the missing conversations auto-create
+      trigger, [BE-11]); unmatch/block need a real match row (no mutual-like
+      trigger, [BE-9]); notification prefs need the signup-created row.
+  Follow-ups:
+    - A6 (reports) once [BE-5] lands.
+    - Views stat once a "who viewed me" RPC exists.
+    - Bio field once [BE-13] adds the column.
+    - Calls tab is history-only until WebRTC/calling UX is built.
