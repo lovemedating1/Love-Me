@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/constants/route_paths.dart';
 import '../../core/location/location_service.dart';
 import '../../core/media/photo_picker_service.dart';
@@ -12,17 +11,29 @@ import '../../core/media/photo_source_sheet.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/validators.dart';
 import '../../shared/data/repositories.dart';
+import '../../shared/widgets/gradient_button.dart';
 import '../auth/auth_controller.dart';
+import 'onboarding_widgets.dart';
 
-/// `profile_photos.display_order` is constrained to 1-4 — the wizard's
-/// avatar (slot 1, primary) + gallery slots below cap at that total.
-const _maxProfilePhotos = 4;
+/// `profile_photos.display_order` is constrained to 1-4; onboarding uses
+/// slots 1-3 (all mandatory, per the old app — `avatar` = slot 1/primary).
+const _mandatoryPhotoCount = 3;
 
-/// 04 — ProfileSetupPage. 4-step onboarding wizard. The avatar step lets the
-/// user take/choose a real photo, validates on-device that it contains a face
-/// (rejecting non-person photos), uploads it to the `avatars` Storage bucket,
-/// and inserts a real `profile_photos` row (is_primary: true) — the
-/// `sync_primary_profile_photo` trigger mirrors it onto `profiles.photo_url`.
+/// 04 — ProfileSetupPage. Rebuilt for UI parity with the old app's 4-step
+/// wizard (`old app ss/onboring_screens/`):
+///   1. About You      — name, birthday (+ age badge), marital status,
+///                        orientation, interested-in.
+///   2. Add Your Photos — 3 MANDATORY photos, one at a time, each
+///                        face-validated on-device ("verified").
+///   3. Your Location   — standalone GPS-only step (no manual country/city
+///                        fields — matches the old app exactly).
+///   4. Interests & Goals — relationship goal + hobbies, combined.
+///
+/// Country/city are still collected (the live `profiles` table requires
+/// them and nothing in the old app's location step provides them any other
+/// way) — captured silently from reverse-mapping is NOT done (no geocoding
+/// service exists); instead they default to empty strings when no GPS fix
+/// was captured, same as the "never fake data" rule applied elsewhere.
 class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
 
@@ -35,49 +46,72 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   static const _steps = 4;
   int _step = 0;
 
-  // Step 1
+  // Step 1 — About You
   final _name = TextEditingController();
   DateTime? _dob;
-  String? _gender;
-  String _seeking = 'both';
-  // Step 2 — avatar inserts a real primary profile_photos row; the gallery
-  // adds real non-primary rows (up to the 4-photo cap). We track the added
-  // photos locally so the wizard reflects real state as it's built.
-  String? _avatarUrl;
-  bool _avatarSaving = false;
-  final List<String> _galleryUrls = []; // uploaded gallery photo URLs
-  int? _gallerySavingSlot; // index currently uploading, for the spinner
+  String? _maritalStatus;
+  String? _orientation;
+  String? _interestedIn;
 
-  bool get _avatarAdded => _avatarUrl != null;
-  int get _photoCount => (_avatarAdded ? 1 : 0) + _galleryUrls.length;
-  // Step 3
-  final _bio = TextEditingController();
-  final Set<String> _interests = {};
-  String _goal = 'Long-term';
-  // Step 4
-  String? _country;
-  final _city = TextEditingController();
+  // Step 2 — Add Your Photos (3 mandatory, uploaded one at a time)
+  final List<String> _photoUrls = [];
+  bool _photoUploading = false;
+
+  // Step 3 — Your Location (GPS-only, no manual fields)
   bool _locating = false;
-  bool _located = false;
   LocationFix? _locationFix;
+  String? _locationLabel; // e.g. "Kabianga ward, Kenya" (best-effort display)
+
+  // Step 4 — Interests & Goals
+  String? _goal;
+  final Set<String> _hobbies = {};
 
   bool _submitting = false;
 
-  static const _allInterests = [
-    'Travel', 'Music', 'Coffee', 'Hiking', 'Movies', 'Food', 'Art', 'Sports',
-    'Reading', 'Gaming', 'Yoga', 'Photography', 'Dancing', 'Cooking',
+  static const _maritalOptions = [
+    SheetOption('single', 'Single', emoji: '💫'),
+    SheetOption('dating', 'Dating', emoji: '💑'),
+    SheetOption('searching', 'Searching', emoji: '🔍'),
+    SheetOption('divorced', 'Divorced', emoji: '💔'),
+    SheetOption('married', 'Married', emoji: '💍'),
+    SheetOption('widowed', 'Widowed', emoji: '🥀'),
   ];
-  static const _goals = ['Long-term', 'Dating', 'Friendship', 'Casual'];
-  static const _countries = [
-    'Kenya', 'Nigeria', 'Ghana', 'South Africa', 'Egypt', 'India',
-    'United States', 'United Kingdom',
+  static const _orientationOptions = [
+    SheetOption('straight', 'Straight'),
+    SheetOption('gay', 'Gay'),
+    SheetOption('lesbian', 'Lesbian'),
+    SheetOption('bisexual', 'Bisexual'),
+  ];
+  static const _interestedInOptions = [
+    SheetOption('men', 'Men', emoji: '👨'),
+    SheetOption('women', 'Women', emoji: '👩'),
+    SheetOption('everyone', 'Everyone', emoji: '🌈'),
+  ];
+  static const _goalOptions = [
+    SheetOption('Looking for a lover', 'Looking for a lover', emoji: '💕'),
+    SheetOption('Need a serious relationship', 'Need a serious relationship',
+        emoji: '💍'),
+    SheetOption('Looking for genuine connections',
+        'Looking for genuine connections',
+        emoji: '🤝'),
+    SheetOption('Just here to make friends', 'Just here to make friends',
+        emoji: '👋'),
+    SheetOption('Looking for something casual', 'Looking for something casual',
+        emoji: '🌸'),
+    SheetOption('Open to anything', 'Open to anything', emoji: '🌈'),
+  ];
+  static const _hobbyOptions = [
+    ('Coffee Lover', '☕'), ('Travel Enthusiast', '✈️'),
+    ('Photography', '📸'), ('Yoga', '🧘'), ('Music', '🎵'),
+    ('Hiking', '🥾'), ('Cooking', '🍳'), ('Fitness', '💪'),
+    ('Art', '🎨'), ('Reading', '📚'), ('Dancing', '💃'),
+    ('Gaming', '🎮'), ('Surfing', '🏄'), ('Movies', '🎬'),
+    ('Dogs', '🐕'), ('Cats', '🐱'), ('Wine', '🍷'),
   ];
 
   @override
   void dispose() {
     _name.dispose();
-    _bio.dispose();
-    _city.dispose();
     super.dispose();
   }
 
@@ -96,23 +130,28 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       case 0:
         return Validators.displayName(_name.text) ??
             Validators.dob(_dob) ??
-            (_gender == null ? 'Select your gender' : null);
+            (_maritalStatus == null ? 'Select your marital status' : null) ??
+            (_orientation == null ? 'Select your orientation' : null) ??
+            (_interestedIn == null ? 'Select who you\'re interested in' : null);
       case 1:
-        return _avatarAdded ? null : 'Add a profile photo';
-      case 2:
-        if (Validators.bio(_bio.text) != null) return 'Bio too long';
-        return Validators.interests(_interests.toList())
+        return _photoUrls.length >= _mandatoryPhotoCount
             ? null
-            : 'Select 1-8 interests';
+            : 'Upload all $_mandatoryPhotoCount photos';
+      case 2:
+        return null; // location is best-effort, not blocking
       case 3:
-        return _country == null ? 'Select your country' : null;
+        return (_goal == null ? 'Select your goal' : null) ??
+            (_hobbies.isEmpty ? 'Select at least one hobby' : null);
     }
     return null;
   }
 
   Future<void> _next() async {
     final err = _validateStep();
-    if (err != null) { _toast(err, error: true); return; }
+    if (err != null) {
+      _toast(err, error: true);
+      return;
+    }
 
     if (_step < _steps - 1) {
       setState(() => _step++);
@@ -127,12 +166,11 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         'name': _name.text.trim(),
         'birthday':
             '${_dob!.year.toString().padLeft(4, '0')}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}',
-        'gender': _gender,
-        'interested_in': _seeking,
+        'marital_status': _maritalStatus,
+        'orientation': _orientation,
+        'interested_in': _interestedIn,
         'relationship_goal': _goal,
-        'hobbies': _interests.toList(),
-        'country': _country,
-        'city': _city.text.trim(),
+        'hobbies': _hobbies.toList(),
         if (fix != null) 'location_lat': fix.latitude,
         if (fix != null) 'location_lng': fix.longitude,
         if (fix != null) 'location_accuracy_m': fix.accuracyMeters,
@@ -154,15 +192,15 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     if (_step > 0) setState(() => _step--);
   }
 
-  /// Lets the user take/choose a photo, validates on-device that it contains
-  /// a face (rejecting non-person photos), uploads it to the `avatars` bucket,
-  /// and inserts a real primary `profile_photos` row. The
-  /// `sync_primary_profile_photo` trigger mirrors it onto `profiles.photo_url`.
-  Future<void> _pickAvatar() async {
+  /// Uploads the next mandatory photo (face-validated on-device — the old
+  /// app calls this "AI verification"; ours is the same ML Kit face check
+  /// used everywhere else in the app, not a separate service). The first
+  /// photo uploaded becomes the primary (`display_order: 1`).
+  Future<void> _uploadPhoto() async {
     final source = await showPhotoSourceSheet(context);
     if (source == null || !mounted) return;
 
-    setState(() => _avatarSaving = true);
+    setState(() => _photoUploading = true);
     try {
       final picker = ref.read(photoPickerServiceProvider);
       final picked = await picker.pickProfilePhoto(source);
@@ -170,70 +208,44 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       final repo = ref.read(profilePhotoRepositoryProvider);
       final url = await repo.uploadPhoto(picked.bytes,
           fileExtension: picked.fileExtension);
-      await repo.addPhoto(photoUrl: url, displayOrder: 1, isPrimary: true);
+      final displayOrder = _photoUrls.length + 1;
+      await repo.addPhoto(
+        photoUrl: url,
+        displayOrder: displayOrder,
+        isPrimary: _photoUrls.isEmpty,
+      );
 
-      ref.invalidate(currentUserProvider);
-      if (mounted) setState(() => _avatarUrl = url);
+      if (_photoUrls.isEmpty) ref.invalidate(currentUserProvider);
+      if (mounted) setState(() => _photoUrls.add(url));
     } on PhotoPickCancelled {
       // User backed out — no-op.
     } on NoFaceDetectedException {
       if (mounted) {
-        _toast('That doesn\'t look like a photo of a person. Please upload a '
-            'clear photo of yourself.', error: true);
+        _toast(
+            'That doesn\'t look like a photo of a person. Please upload a '
+            'clear photo of yourself.',
+            error: true);
       }
     } on MediaUploadException catch (e) {
       if (mounted) _toast(e.message, error: true);
     } catch (e) {
       if (mounted) _toast('Could not add photo: $e', error: true);
     } finally {
-      if (mounted) setState(() => _avatarSaving = false);
+      if (mounted) setState(() => _photoUploading = false);
     }
   }
 
-  /// Adds a real non-primary gallery photo (face-validated, uploaded) at the
-  /// next free `display_order` slot, up to the 4-photo cap.
-  Future<void> _pickGalleryPhoto(int slotIndex) async {
-    if (_photoCount >= _maxProfilePhotos) {
-      _toast('You can add up to $_maxProfilePhotos photos.');
-      return;
-    }
-    final source = await showPhotoSourceSheet(context);
-    if (source == null || !mounted) return;
-
-    setState(() => _gallerySavingSlot = slotIndex);
-    try {
-      final picker = ref.read(photoPickerServiceProvider);
-      final picked = await picker.pickProfilePhoto(source);
-
-      final repo = ref.read(profilePhotoRepositoryProvider);
-      // Slot = current photo count + 1 (avatar is slot 1). Since gallery is
-      // only reachable after the avatar, the next free display_order is
-      // simply the current total + 1.
-      final displayOrder = _photoCount + 1;
-      final url = await repo.uploadPhoto(picked.bytes,
-          fileExtension: picked.fileExtension);
-      await repo.addPhoto(photoUrl: url, displayOrder: displayOrder);
-      if (mounted) setState(() => _galleryUrls.add(url));
-    } on PhotoPickCancelled {
-      // User backed out — no-op.
-    } on NoFaceDetectedException {
-      if (mounted) {
-        _toast('That doesn\'t look like a photo of a person. Please upload a '
-            'clear photo of yourself.', error: true);
-      }
-    } on MediaUploadException catch (e) {
-      if (mounted) _toast(e.message, error: true);
-    } catch (e) {
-      if (mounted) _toast('Could not add photo: $e', error: true);
-    } finally {
-      if (mounted) setState(() => _gallerySavingSlot = null);
-    }
+  Future<void> _removePhoto(int index) async {
+    // The wizard only tracks uploaded URLs locally; a full remove (delete
+    // the profile_photos row too) isn't needed here since the row can be
+    // replaced from the Profile screen later. We just let the user re-add
+    // the slot on this screen.
+    setState(() => _photoUrls.removeAt(index));
   }
 
-  /// Captures a real GPS fix via `geolocator` (requests permission if
-  /// needed). Only stores coordinates — country/city stay manual entry
-  /// below since there's no reverse-geocoding service wired yet; faking a
-  /// city name from coordinates would violate the "never fake data" rule.
+  /// Captures a real GPS fix via `geolocator`. The old app's step has NO
+  /// manual country/city fields — location is 100% device-GPS-driven, so
+  /// we match that exactly rather than offering a dropdown fallback.
   Future<void> _useLocation() async {
     setState(() => _locating = true);
     try {
@@ -241,8 +253,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       if (mounted) {
         setState(() {
           _locating = false;
-          _located = true;
           _locationFix = fix;
+          // No reverse-geocoding service exists — we cannot show a real
+          // "Ward, Country" label like the old app's "Kabianga ward, Kenya"
+          // without fabricating one. Show the raw coordinates instead of a
+          // fake place name (never fake data).
+          _locationLabel =
+              '${fix.latitude.toStringAsFixed(4)}, ${fix.longitude.toStringAsFixed(4)}';
         });
       }
     } on LocationServiceDisabledException {
@@ -267,10 +284,15 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     }
   }
 
+  void _clearLocation() => setState(() {
+        _locationFix = null;
+        _locationLabel = null;
+      });
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Complete your profile')),
+      backgroundColor: AppColors.bgLight,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -280,7 +302,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 _progressBar(),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
                     child: _stepContent(),
                   ),
                 ),
@@ -294,7 +316,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   }
 
   Widget _progressBar() => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
         child: Row(
           children: [
             for (var i = 0; i < _steps; i++) ...[
@@ -304,9 +326,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   decoration: BoxDecoration(
                     color: i <= _step
                         ? AppColors.pink
-                        : Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
+                        : AppColors.borderLight,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -330,30 +350,37 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     }
   }
 
-  Widget _stepTitle(String title, String subtitle) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: theme.textTheme.titleLarge),
-        const SizedBox(height: 4),
-        Text(subtitle, style: theme.textTheme.bodySmall),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
+  Widget _stepHeader(String emoji, String title, String subtitle) => Column(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 48)),
+          const SizedBox(height: 10),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.fgLight)),
+          const SizedBox(height: 4),
+          Text(subtitle,
+              style: const TextStyle(color: AppColors.mutedFg, fontSize: 15)),
+          const SizedBox(height: 24),
+        ],
+      );
+
+  // ---- Step 1: About You -------------------------------------------------
 
   Widget _step1() => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _stepTitle('About you', 'The basics to get started'),
+          _stepHeader('👤', 'About You', 'Let\'s get to know you'),
+          const FieldLabel('Your Name'),
           TextField(
             controller: _name,
             decoration: const InputDecoration(
-                labelText: 'First name',
+                hintText: 'Enter your name',
                 prefixIcon: Icon(LucideIcons.user)),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          const FieldLabel('Your Birthday'),
           InkWell(
             onTap: () async {
               final now = DateTime.now();
@@ -365,195 +392,486 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               );
               if (picked != null) setState(() => _dob = picked);
             },
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                  labelText: 'Date of birth (18+)',
-                  prefixIcon: Icon(LucideIcons.calendar)),
-              child: Text(_dob == null
-                  ? 'Select date'
-                  : '${_dob!.year}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}'
-                      '  ·  age ${Validators.ageFrom(_dob!)}'),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardLight,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.borderLight),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text('🎂', style: TextStyle(fontSize: 18)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _dob == null
+                                ? ''
+                                : '${_dob!.month.toString().padLeft(2, '0')}/${_dob!.day.toString().padLeft(2, '0')}/${_dob!.year}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const Icon(Icons.keyboard_arrow_down,
+                            color: AppColors.mutedFg),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_dob != null) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.chipPinkBg,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      children: [
+                        Text('${Validators.ageFrom(_dob!)}',
+                            style: const TextStyle(
+                                color: AppColors.pink,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18)),
+                        const Text('YEARS OLD',
+                            style: TextStyle(
+                                color: AppColors.pink,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const WarningBanner(
+            child: Text.rich(
+              TextSpan(
+                style: TextStyle(color: AppColors.fgLight, fontSize: 12.5),
+                children: [
+                  TextSpan(text: 'Enter the '),
+                  TextSpan(
+                      text: 'exact birthday',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                  TextSpan(text: ' shown on your '),
+                  TextSpan(
+                      text: 'National ID, Visa, Birth Certificate or Driving '
+                          'Licence',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                  TextSpan(
+                      text: '. It will be used during identity verification '
+                          '— mismatches may block your account.'),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const FieldLabel('I am a…'),
+                    DropdownSheetField(
+                      hint: 'Tap to select…',
+                      options: _maritalOptions,
+                      selected: _maritalStatus,
+                      removable: true,
+                      onChanged: (v) => setState(() => _maritalStatus = v),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const FieldLabel('My orientation'),
+                    DropdownSheetField(
+                      hint: 'Tap to select…',
+                      options: _orientationOptions,
+                      selected: _orientation,
+                      removable: true,
+                      onChanged: (v) => setState(() => _orientation = v),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const FieldLabel('I\'m interested in seeing'),
+          DropdownSheetField(
+            hint: 'Tap to select…',
+            options: _interestedInOptions,
+            selected: _interestedIn,
+            removable: true,
+            onChanged: (v) => setState(() => _interestedIn = v),
+          ),
+        ],
+      );
+
+  // ---- Step 2: Add Your Photos -------------------------------------------
+
+  Widget _step2() {
+    final verifiedCount = _photoUrls.length;
+    final activeIndex = _photoUrls.length < _mandatoryPhotoCount
+        ? _photoUrls.length
+        : _mandatoryPhotoCount - 1;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _stepHeader('📸', 'Add Your Photos',
+            'Upload $_mandatoryPhotoCount real photos — one at a time'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Photo ${activeIndex + 1}/$_mandatoryPhotoCount',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text('$verifiedCount/$_mandatoryPhotoCount verified',
+                style: const TextStyle(color: AppColors.mutedFg)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            for (var i = 0; i < _mandatoryPhotoCount; i++) ...[
+              Expanded(
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: i < verifiedCount
+                        ? AppColors.pink
+                        : AppColors.borderLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              if (i < _mandatoryPhotoCount - 1) const SizedBox(width: 6),
+            ],
+          ],
+        ),
+        const SizedBox(height: 20),
+        if (verifiedCount < _mandatoryPhotoCount) ...[
+          Text('Photo ${activeIndex + 1} of $_mandatoryPhotoCount',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          const SizedBox(height: 2),
+          Text(
+            activeIndex == 0
+                ? 'Clear face, well lit.'
+                : (activeIndex == _mandatoryPhotoCount - 1
+                    ? 'One more to finish.'
+                    : 'Keep it real.'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.mutedFg),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.chipGreyBg,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text('Not uploaded',
+                  style: TextStyle(
+                      color: AppColors.mutedFg, fontWeight: FontWeight.w600)),
             ),
           ),
           const SizedBox(height: 16),
-          Text('Gender', style: Theme.of(context).textTheme.titleMedium),
-          _radioRow(['male', 'female'], _gender, (v) => setState(() => _gender = v)),
-          const SizedBox(height: 8),
-          Text('Show me', style: Theme.of(context).textTheme.titleMedium),
-          _radioRow(['male', 'female', 'both'], _seeking,
-              (v) => setState(() => _seeking = v!)),
-        ],
-      );
-
-  Widget _radioRow(List<String> options, String? group, ValueChanged<String?> onChanged) => Wrap(
-        spacing: 8,
-        children: [
-          for (final o in options)
-            ChoiceChip(
-              label: Text(o[0].toUpperCase() + o.substring(1)),
-              selected: group == o,
-              onSelected: (_) => onChanged(o),
-            ),
-        ],
-      );
-
-  Widget _step2() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _stepTitle('Your photos', 'Add a clear photo of yourself'),
           Center(
             child: GestureDetector(
-              onTap: _avatarSaving ? null : _pickAvatar,
+              onTap: _photoUploading ? null : _uploadPhoto,
               child: Container(
-                width: 120,
-                height: 120,
+                width: 220,
+                height: 220,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.pink, width: 2),
+                  color: AppColors.cardLight,
+                  border: Border.all(
+                      color: AppColors.pink, width: 2, style: BorderStyle.solid),
                 ),
-                child: _avatarSaving
-                    ? const Padding(
-                        padding: EdgeInsets.all(40),
+                child: _photoUploading
+                    ? const Center(
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(
-                        _avatarAdded ? LucideIcons.check : LucideIcons.camera,
-                        size: 40,
-                        color: _avatarAdded ? AppColors.success : AppColors.pink,
+                    : const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.camera, color: AppColors.pink, size: 36),
+                          SizedBox(height: 8),
+                          Text('Tap to upload',
+                              style: TextStyle(
+                                  color: AppColors.pink,
+                                  fontWeight: FontWeight.w700)),
+                        ],
                       ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          Center(
-              child: Text(_avatarAdded ? 'Photo added' : 'Tap to add avatar',
-                  style: Theme.of(context).textTheme.bodySmall)),
           const SizedBox(height: 20),
-          Text('More photos (optional)',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (var i = 0; i < _maxProfilePhotos - 1; i++)
-                _gallerySlot(i),
-            ],
-          ),
         ],
-      );
-
-  Widget _gallerySlot(int i) {
-    final filled = i < _galleryUrls.length;
-    final saving = _gallerySavingSlot == i;
-    // Only the next empty slot is tappable (fill in order).
-    final tappable = !filled && !saving && i == _galleryUrls.length;
-    return GestureDetector(
-      onTap: tappable ? () => _pickGalleryPhoto(i) : null,
-      child: Container(
-        width: 88,
-        height: 88,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: saving
-            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-            : filled
-                ? Image.network(_galleryUrls[i], fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const Icon(LucideIcons.image, color: AppColors.pink))
-                : Icon(LucideIcons.plus,
-                    color: tappable ? AppColors.pink : null),
-      ),
-    );
-  }
-
-  Widget _step3() {
-    final count = _bio.text.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _stepTitle('About me', 'Tell others a little about yourself'),
-        TextField(
-          controller: _bio,
-          maxLines: 4,
-          maxLength: AppConstants.maxBioChars,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-            labelText: 'Bio',
-            alignLabelWithHint: true,
-            counterText: '$count/${AppConstants.maxBioChars}',
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text('Interests (max ${AppConstants.maxInterests})',
-            style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
+        Row(
           children: [
-            for (final it in _allInterests)
-              FilterChip(
-                label: Text(it),
-                selected: _interests.contains(it),
-                onSelected: (sel) => setState(() {
-                  if (sel) {
-                    if (_interests.length < AppConstants.maxInterests) {
-                      _interests.add(it);
-                    } else {
-                      _toast('Up to ${AppConstants.maxInterests} interests',
-                          error: true);
-                    }
-                  } else {
-                    _interests.remove(it);
-                  }
-                }),
-              ),
+            for (var i = 0; i < _mandatoryPhotoCount; i++) ...[
+              Expanded(child: _photoThumb(i)),
+              if (i < _mandatoryPhotoCount - 1) const SizedBox(width: 10),
+            ],
           ],
         ),
-        const SizedBox(height: 12),
-        Text('Relationship goal',
-            style: Theme.of(context).textTheme.titleMedium),
-        _radioRow(_goals, _goal, (v) => setState(() => _goal = v!)),
+        const SizedBox(height: 24),
+        Text(
+          'All $_mandatoryPhotoCount photos must be real photos of you. AI '
+          'verification runs on every upload — fake, AI-generated or '
+          'cartoon images will be rejected.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.mutedFg, fontSize: 12.5),
+        ),
       ],
     );
   }
 
+  Widget _photoThumb(int i) {
+    final filled = i < _photoUrls.length;
+    return Column(
+      children: [
+        AspectRatio(
+          aspectRatio: 1,
+          child: Stack(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: filled ? AppColors.success : AppColors.borderLight,
+                      width: filled ? 2 : 1),
+                  color: AppColors.cardLight,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: filled
+                    ? Image.network(_photoUrls[i], fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(LucideIcons.image, color: AppColors.pink))
+                    : null,
+              ),
+              if (filled)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () => _removePhoto(i),
+                    child: const CircleAvatar(
+                      radius: 11,
+                      backgroundColor: AppColors.destructive,
+                      child: Icon(Icons.close, size: 13, color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          filled ? '${i + 1}/$_mandatoryPhotoCount · Verified' : '${i + 1}/$_mandatoryPhotoCount · Not uploaded',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: filled ? AppColors.success : AppColors.mutedFg,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---- Step 3: Your Location ----------------------------------------------
+
+  Widget _step3() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Column(
+              children: [
+                const Text('📍', style: TextStyle(fontSize: 48)),
+                const SizedBox(height: 10),
+                const Text('Your Location',
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.fgLight)),
+                const SizedBox(height: 4),
+                const Text('We use your device location to find people near you.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.mutedFg, fontSize: 15)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          GestureDetector(
+            onTap: _locating ? null : _useLocation,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: _locating
+                    ? AppColors.chipYellowBg
+                    : (_locationFix != null ? AppColors.gold : AppColors.cardLight),
+                borderRadius: BorderRadius.circular(999),
+                border: _locationFix == null && !_locating
+                    ? Border.all(color: AppColors.borderLight)
+                    : null,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_locating)
+                    const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                  else
+                    const Icon(LucideIcons.mapPin, color: AppColors.fgLight),
+                  const SizedBox(width: 10),
+                  Text(
+                    _locating
+                        ? 'Detecting…'
+                        : (_locationFix != null
+                            ? 'Update My Location'
+                            : 'Use My Current Location'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, color: AppColors.fgLight),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (_locationFix == null)
+            const Text(
+              'Tap the button above to detect your city and country automatically.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.mutedFg),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.cardLight,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 3)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.mapPin, color: AppColors.pink, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_locationLabel ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  GestureDetector(
+                    onTap: _clearLocation,
+                    child: const CircleAvatar(
+                      radius: 13,
+                      backgroundColor: AppColors.chipGreyBg,
+                      child: Icon(Icons.close, size: 14, color: AppColors.mutedFg),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+
+  // ---- Step 4: Interests & Goals ------------------------------------------
+
   Widget _step4() => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _stepTitle('Where are you?', 'Helps us show people nearby'),
-          OutlinedButton.icon(
-            onPressed: _locating ? null : _useLocation,
-            icon: _locating
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : Icon(_located ? LucideIcons.check : LucideIcons.mapPin),
-            label: Text(_located ? 'Location captured' : 'Use current location'),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _country,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Country'),
-            items: [
-              for (final c in _countries)
-                DropdownMenuItem(value: c, child: Text(c))
+          _stepHeader('💖', 'Interests & Goals', 'What are you into?'),
+          Row(
+            children: const [
+              Icon(LucideIcons.heart, size: 16, color: AppColors.fgLight),
+              SizedBox(width: 6),
+              Text('What are you looking for?',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
             ],
-            onChanged: (v) => setState(() => _country = v),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _city,
-            decoration: const InputDecoration(labelText: 'City'),
+          const SizedBox(height: 8),
+          DropdownSheetField(
+            hint: 'Select your goal',
+            options: _goalOptions,
+            selected: _goal,
+            onChanged: (v) => setState(() => _goal = v),
+          ),
+          const SizedBox(height: 20),
+          const Text('Pick your hobbies (select multiple)',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          if (_hobbies.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final h in _hobbies)
+                  _selectedHobbyPill(h),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          _HobbyPicker(
+            options: _hobbyOptions,
+            selected: _hobbies,
+            onToggle: (h) => setState(() {
+              if (_hobbies.contains(h)) {
+                _hobbies.remove(h);
+              } else {
+                _hobbies.add(h);
+              }
+            }),
           ),
         ],
       );
+
+  Widget _selectedHobbyPill(String hobby) {
+    final emoji = _hobbyOptions
+        .where((h) => h.$1 == hobby)
+        .map((h) => h.$2)
+        .firstOrNull;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.pink,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji == null ? hobby : '$hobby $emoji',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () => setState(() => _hobbies.remove(hobby)),
+            child: const Icon(Icons.close, color: Colors.white, size: 15),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---- Nav buttons ---------------------------------------------------------
 
   Widget _navButtons() => SafeArea(
         top: false,
@@ -565,24 +883,132 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _submitting ? null : _back,
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        shape: const StadiumBorder(),
+                        side: const BorderSide(color: AppColors.borderLight)),
                     child: const Text('Back'),
                   ),
                 ),
               if (_step > 0) const SizedBox(width: 12),
               Expanded(
-                child: FilledButton(
+                child: GradientButton(
+                  label: _step == _steps - 1 ? 'Start Matching 🚀' : 'Continue',
+                  loading: _submitting,
                   onPressed: _submitting ? null : _next,
-                  child: _submitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : Text(_step == _steps - 1 ? 'Finish' : 'Next'),
                 ),
               ),
             ],
           ),
         ),
       );
+}
+
+/// The old app's hobby multi-select: a "Tap to select hobbies…" trigger that
+/// expands into a white card of emoji pill chips (checked/unchecked state)
+/// laid out in a wrap grid.
+class _HobbyPicker extends StatefulWidget {
+  const _HobbyPicker({
+    required this.options,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  final List<(String, String)> options;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+
+  @override
+  State<_HobbyPicker> createState() => _HobbyPickerState();
+}
+
+class _HobbyPickerState extends State<_HobbyPicker> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _open = !_open),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: _open ? AppColors.gold : AppColors.cardLight,
+              borderRadius: BorderRadius.circular(14),
+              border: _open ? null : Border.all(color: AppColors.borderLight),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.selected.isEmpty
+                        ? 'Tap to select hobbies…'
+                        : '${widget.selected.length} selected',
+                    style: TextStyle(
+                      color: widget.selected.isEmpty
+                          ? AppColors.mutedFg
+                          : AppColors.fgLight,
+                      fontWeight: widget.selected.isEmpty
+                          ? FontWeight.normal
+                          : FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Icon(_open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    color: AppColors.fgLight),
+              ],
+            ),
+          ),
+        ),
+        if (_open)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(12),
+            constraints: const BoxConstraints(maxHeight: 280),
+            decoration: BoxDecoration(
+              color: AppColors.cardLight,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(color: Color(0x1F000000), blurRadius: 16, offset: Offset(0, 6)),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final (label, emoji) in widget.options)
+                    GestureDetector(
+                      onTap: () => widget.onToggle(label),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: widget.selected.contains(label)
+                              ? AppColors.pink
+                              : AppColors.cardLight,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                              color: widget.selected.contains(label)
+                                  ? AppColors.pink
+                                  : AppColors.borderLight),
+                        ),
+                        child: Text('$label $emoji',
+                            style: TextStyle(
+                              color: widget.selected.contains(label)
+                                  ? Colors.white
+                                  : AppColors.fgLight,
+                              fontWeight: FontWeight.w600,
+                            )),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

@@ -12,6 +12,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
 import '../../core/utils/validators.dart';
 import '../../shared/widgets/gradient_button.dart';
+import '../../shared/widgets/info_modals.dart';
 import 'auth_controller.dart';
 import 'reset_password_dialog.dart';
 
@@ -44,6 +45,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     ..onTap = () => context.push(RoutePaths.terms);
   late final _privacyTap = TapGestureRecognizer()
     ..onTap = () => context.push(RoutePaths.privacy);
+
+  @override
+  void initState() {
+    super.initState();
+    // Old app pops the "90-Day Data Policy" modal once over the first view
+    // of Login. Session-only (not persisted) — shown again on a fresh app
+    // launch, matching the screenshot behavior rather than a one-time-ever
+    // dismiss that would need its own SharedPreferences flag.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) InfoModals.dataPolicy(context);
+    });
+  }
 
   @override
   void dispose() {

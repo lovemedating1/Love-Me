@@ -143,9 +143,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _appearanceCard() {
     final themeMode = ref.watch(themeModeProvider);
-    final isDark = themeMode == ThemeMode.dark ||
-        (themeMode == ThemeMode.system &&
-            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+    final isDark = themeMode == ThemeMode.dark;
     return Container(
       decoration: _cardDecoration,
       child: Column(

@@ -136,6 +136,62 @@ class InfoModals {
     final m = d.minute.toString().padLeft(2, '0');
     return '${d.month}/${d.day}/${d.year}, $h:$m $ampm';
   }
+
+  /// "90-Day Data Policy" modal — shown once over the Auth screen (old app:
+  /// pops up over Login on first view). Explains that inactive accounts are
+  /// purged after 90 days and can re-signup with the same email.
+  static Future<void> dataPolicy(BuildContext context) => showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('📌 90-Day Data Policy',
+                          style: TextStyle(
+                              fontSize: 19, fontWeight: FontWeight.w800)),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.of(ctx).pop(),
+                      child: const Icon(Icons.close, color: AppColors.mutedFg),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgLight,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Text(
+                    'Your account data is automatically deleted after 90 '
+                    'days from signup. You\'ll be notified daily of your '
+                    'remaining days. After expiry, you can sign up again '
+                    'with a fresh account — even using the same email '
+                    'address you used before.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.mutedFg, height: 1.4),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GradientButton(
+                  label: 'I Understand',
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
 
 class _ExpiryDialog extends StatelessWidget {

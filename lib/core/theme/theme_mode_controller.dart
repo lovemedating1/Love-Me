@@ -2,28 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persists the user's light/dark/system theme choice across app restarts.
+/// Persists the user's light/dark theme choice across app restarts.
 ///
 /// Backed by [SharedPreferences] under [_prefsKey]. Defaults to
-/// [ThemeMode.system] until a preference has been saved, matching the
-/// "Dark Mode" switch semantics used in Settings (off = light, on = dark —
-/// system is only the initial/unset state, never re-selectable from the UI).
+/// [ThemeMode.light] until a preference has been saved — the app's design is
+/// pink-on-white and is meant to be seen in light mode by default, so it
+/// deliberately does NOT follow the OS theme on first launch (unlike a
+/// typical app default of [ThemeMode.system]).
 class ThemeModeController extends Notifier<ThemeMode> {
   static const _prefsKey = 'app.theme_mode';
 
   @override
   ThemeMode build() {
     _load();
-    return ThemeMode.system;
+    return ThemeMode.light;
   }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_prefsKey);
     state = switch (saved) {
-      'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
+      _ => ThemeMode.light,
     };
   }
 

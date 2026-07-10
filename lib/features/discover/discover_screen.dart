@@ -150,8 +150,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               _aboveCard(),
               const SizedBox(height: 14),
               _card(remaining.first),
-              const SizedBox(height: 20),
-              _actionRow(remaining.first),
             ],
           );
         },
@@ -237,259 +235,308 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
     void selectPhoto(int i) => setState(() => _photoIndex[p.userId] = i);
 
-    return GestureDetector(
-      onPanStart: (_) => setState(() => _dragging = true),
-      onPanUpdate: (d) => setState(() => _dragOffset += d.delta),
-      onPanEnd: (_) {
-        const threshold = 110.0;
-        if (_dragOffset.dx > threshold) {
-          _like(p);
-        } else if (_dragOffset.dx < -threshold) {
-          _pass(p);
-        } else {
-          setState(() {
-            _dragging = false;
-            _dragOffset = Offset.zero;
-          });
-        }
-      },
-      child: AnimatedContainer(
-        duration: _dragging
-            ? Duration.zero
-            : const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        transform: Matrix4.translationValues(_dragOffset.dx, 0, 0)
-          ..rotateZ(_dragOffset.dx / 900),
-        transformAlignment: Alignment.center,
-        child: AspectRatio(
-          aspectRatio: 3 / 4,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (photoUrls.isNotEmpty)
-                  GestureDetector(
-                    onTap: advancePhoto,
-                    child: CachedNetworkImage(
-                      imageUrl: photoUrls[activeIndex],
-                      fit: BoxFit.cover,
-                      placeholder: (_, _) => Container(
-                          color: theme.colorScheme.surfaceContainerHighest),
-                      errorWidget: (_, _, _) => Container(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: const Icon(LucideIcons.user, size: 64)),
-                    ),
-                  )
-                else
-                  Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: const Icon(LucideIcons.user, size: 64),
-                  ),
-                // gradient scrim
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.center,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black54],
-                    ),
-                  ),
-                ),
-                // Segmented progress bars (only when there's more than 1 photo).
-                if (photoUrls.length > 1)
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    right: 10,
-                    child: Row(
-                      children: [
-                        for (var i = 0; i < photoUrls.length; i++)
-                          Expanded(
-                            child: Container(
-                              margin: EdgeInsets.only(
-                                  right: i == photoUrls.length - 1 ? 0 : 4),
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: i <= activeIndex
-                                    ? Colors.white
-                                    : Colors.white30,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                // Top-left: marital status + report pills.
-                Positioned(
-                  top: 22,
-                  left: 12,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (p.maritalStatus != null)
-                        AppChip(
-                          label: 'Marital Status: ${p.maritalStatus}',
-                          emoji: '💫',
-                          tone: AppChipTone.dark,
-                          dense: true,
-                        ),
-                      const SizedBox(height: 6),
-                      GestureDetector(
-                        onTap: () => _report(p),
-                        child: const AppChip(
-                          label: 'Report',
-                          icon: LucideIcons.shieldAlert,
-                          tone: AppChipTone.dark,
-                          dense: true,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onPanStart: (_) => setState(() => _dragging = true),
+          onPanUpdate: (d) => setState(() => _dragOffset += d.delta),
+          onPanEnd: (_) {
+            const threshold = 110.0;
+            if (_dragOffset.dx > threshold) {
+              _like(p);
+            } else if (_dragOffset.dx < -threshold) {
+              _pass(p);
+            } else {
+              setState(() {
+                _dragging = false;
+                _dragOffset = Offset.zero;
+              });
+            }
+          },
+          child: AnimatedContainer(
+            duration: _dragging
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            transform: Matrix4.translationValues(_dragOffset.dx, 0, 0)
+              ..rotateZ(_dragOffset.dx / 900),
+            transformAlignment: Alignment.center,
+            child: AspectRatio(
+              // Taller than a plain 3:4 photo card — the action row now lives
+              // inside the card's bottom (matching the old app), so the card
+              // needs the extra height to fit it without cramping the photo.
+              aspectRatio: 0.62,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (photoUrls.isNotEmpty)
+                      CachedNetworkImage(
+                        imageUrl: photoUrls[activeIndex],
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(
+                            color: theme.colorScheme.surfaceContainerHighest),
+                        errorWidget: (_, _, _) => Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: const Icon(LucideIcons.user, size: 64)),
+                      )
+                    else
+                      Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: const Icon(LucideIcons.user, size: 64),
+                      ),
+                    // gradient scrim
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.center,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.black54],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                // Top-right: verified badge + last-active pill (if known).
-                Positioned(
-                  top: 22,
-                  right: 12,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (p.isVerified)
-                        const Icon(LucideIcons.badgeCheck,
-                            color: Colors.white, size: 26),
-                      // [Phase 2 data gap] "last active" needs
-                      // `user_presence.last_seen`, which nothing reads yet —
-                      // hidden until that's wired.
-                    ],
-                  ),
-                ),
-                // Side photo rail (numbered thumbnails), only with >1 photo.
-                if (photoUrls.length > 1)
-                  Positioned(
-                    right: 10,
-                    top: 0,
-                    bottom: 120,
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (var i = 0; i < photoUrls.length; i++)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: GestureDetector(
-                                onTap: () => selectPhoto(i),
+                    ),
+                    // Segmented progress bars (only when there's more than 1 photo).
+                    if (photoUrls.length > 1)
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        right: 10,
+                        child: Row(
+                          children: [
+                            for (var i = 0; i < photoUrls.length; i++)
+                              Expanded(
                                 child: Container(
-                                  width: 30,
-                                  height: 30,
+                                  margin: EdgeInsets.only(
+                                      right: i == photoUrls.length - 1 ? 0 : 4),
+                                  height: 3,
                                   decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: i == activeIndex
-                                          ? AppColors.pink
-                                          : Colors.white70,
-                                      width: i == activeIndex ? 2.5 : 1.2,
-                                    ),
-                                    image: DecorationImage(
-                                      image: CachedNetworkImageProvider(
-                                          photoUrls[i]),
-                                      fit: BoxFit.cover,
-                                    ),
+                                    color: i <= activeIndex
+                                        ? Colors.white
+                                        : Colors.white30,
+                                    borderRadius: BorderRadius.circular(2),
                                   ),
                                 ),
                               ),
+                          ],
+                        ),
+                      ),
+                    // Top-left: marital status + report pills.
+                    Positioned(
+                      top: 22,
+                      left: 12,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (p.maritalStatus != null)
+                            AppChip(
+                              label: 'Marital Status: ${p.maritalStatus}',
+                              emoji: '💫',
+                              tone: AppChipTone.dark,
+                              dense: true,
                             ),
+                          const SizedBox(height: 6),
+                          GestureDetector(
+                            onTap: () => _report(p),
+                            child: const AppChip(
+                              label: 'Report',
+                              icon: LucideIcons.shieldAlert,
+                              tone: AppChipTone.dark,
+                              dense: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Top-right: verified badge + last-active pill (if known).
+                    Positioned(
+                      top: 22,
+                      right: 12,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (p.isVerified)
+                            const Icon(LucideIcons.badgeCheck,
+                                color: Colors.white, size: 26),
+                          // [Phase 2 data gap] "last active" needs
+                          // `user_presence.last_seen`, which nothing reads yet —
+                          // hidden until that's wired.
+                        ],
+                      ),
+                    ),
+                    // Single "next photo" arrow, centered on the right edge —
+                    // the numbered thumbnails live OUTSIDE the card (see the
+                    // outer Stack sibling below), matching the old app.
+                    if (photoUrls.length > 1)
+                      Positioned(
+                        right: 10,
+                        top: 0,
+                        bottom: 0,
+                        child: Center(
+                          child: GestureDetector(
+                            onTap: advancePhoto,
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black45,
+                              ),
+                              child: const Icon(LucideIcons.chevronRight,
+                                  color: Colors.white, size: 18),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text('${p.name}, ${p.ageLabel}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.headlineMedium
+                                        ?.copyWith(color: Colors.white)),
+                              ),
+                              const SizedBox(width: 8),
+                              if (p.isOnline)
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: const BoxDecoration(
+                                      color: AppColors.online,
+                                      shape: BoxShape.circle),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text('${p.city}, ${p.country}',
+                              style: const TextStyle(color: Colors.white70)),
+                          if (p.relationshipGoal != null) ...[
+                            const SizedBox(height: 4),
+                            Text('Need a ${p.relationshipGoal} 💍',
+                                style: const TextStyle(
+                                    color: Colors.white, fontWeight: FontWeight.w600)),
+                          ],
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              if (p.distanceKm != null)
+                                AppChip(
+                                  label:
+                                      '${p.distanceKm!.toStringAsFixed(0)} km (${(p.distanceKm! * 0.621371).toStringAsFixed(0)} mi) away',
+                                  icon: LucideIcons.mapPin,
+                                  tone: AppChipTone.pink,
+                                  dense: true,
+                                ),
+                              if (p.orientation != null)
+                                AppChip(
+                                  label: p.orientation!,
+                                  emoji: '✨',
+                                  tone: AppChipTone.yellow,
+                                  dense: true,
+                                ),
+                              if (p.interestedIn != null)
+                                AppChip(
+                                  label: 'Likes ${p.interestedIn}',
+                                  icon: LucideIcons.eye,
+                                  tone: AppChipTone.pink,
+                                  dense: true,
+                                ),
+                              for (final hobby in p.hobbies.take(3))
+                                AppChip(label: hobby, tone: AppChipTone.grey, dense: true),
+                            ],
+                          ),
+                          if (p.hobbies.length > 3 || (p.bio ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            GestureDetector(
+                              onTap: () => _showMore(p),
+                              child: const AppChip(
+                                label: 'Show more',
+                                icon: LucideIcons.chevronDown,
+                                tone: AppChipTone.yellow,
+                                dense: true,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          _actionRow(p),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Numbered photo thumbnails, floating OUTSIDE the card's right edge
+        // (matches the old app: they sit over the pink page background, not
+        // inside the black card).
+        if (photoUrls.length > 1)
+          Positioned(
+            right: -8,
+            top: 100,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < photoUrls.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: GestureDetector(
+                      onTap: () => selectPhoto(i),
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: i == activeIndex
+                                    ? AppColors.pink
+                                    : Colors.white,
+                                width: i == activeIndex ? 2.5 : 1.5,
+                              ),
+                              image: DecorationImage(
+                                image: CachedNetworkImageProvider(photoUrls[i]),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints:
+                                const BoxConstraints(minWidth: 16, minHeight: 16),
+                            child: Text('${i + 1}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700)),
+                          ),
                         ],
                       ),
                     ),
                   ),
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 16,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text('${p.name}, ${p.ageLabel}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.headlineMedium
-                                    ?.copyWith(color: Colors.white)),
-                          ),
-                          const SizedBox(width: 8),
-                          if (p.isOnline)
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: const BoxDecoration(
-                                  color: AppColors.online,
-                                  shape: BoxShape.circle),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text('${p.city}, ${p.country}',
-                          style: const TextStyle(color: Colors.white70)),
-                      if (p.relationshipGoal != null) ...[
-                        const SizedBox(height: 4),
-                        Text('Need a ${p.relationshipGoal} 💍',
-                            style: const TextStyle(
-                                color: Colors.white, fontWeight: FontWeight.w600)),
-                      ],
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          if (p.distanceKm != null)
-                            AppChip(
-                              label:
-                                  '${p.distanceKm!.toStringAsFixed(0)} km (${(p.distanceKm! * 0.621371).toStringAsFixed(0)} mi) away',
-                              icon: LucideIcons.mapPin,
-                              tone: AppChipTone.pink,
-                              dense: true,
-                            ),
-                          if (p.orientation != null)
-                            AppChip(
-                              label: p.orientation!,
-                              emoji: '✨',
-                              tone: AppChipTone.yellow,
-                              dense: true,
-                            ),
-                          if (p.interestedIn != null)
-                            AppChip(
-                              label: 'Likes ${p.interestedIn}',
-                              icon: LucideIcons.eye,
-                              tone: AppChipTone.pink,
-                              dense: true,
-                            ),
-                          for (final hobby in p.hobbies.take(3))
-                            AppChip(label: hobby, tone: AppChipTone.grey, dense: true),
-                        ],
-                      ),
-                      if (p.hobbies.length > 3 || (p.bio ?? '').isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: () => _showMore(p),
-                          child: const AppChip(
-                            label: 'Show more',
-                            icon: LucideIcons.chevronDown,
-                            tone: AppChipTone.yellow,
-                            dense: true,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
-        ),
-      ),
+      ],
     );
   }
 

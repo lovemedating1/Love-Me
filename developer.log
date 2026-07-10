@@ -2155,3 +2155,256 @@ Known items to resolve before / during build (from spec analysis):
     checkmarks in every earlier developer.log entry were real for code
     correctness but did NOT catch this, since Dart analysis has no way to
     know a runtime String.fromEnvironment() value will be empty.
+
+[2026-07-11] ONBOARDING UI REBUILD (exact old-app parity) + default theme fix
+  User provided 16 screenshots (app doctumant/old app ss/onboring_screens/)
+  and asked for pixel-parity, explicitly separate from the earlier field/
+  logic diff list already produced this session. Also asked to change the
+  app's default theme from following system/OS brightness to always
+  defaulting to LIGHT (screenshots + bug report showed the app opening in
+  dark mode because the test device's OS was in dark mode).
+
+  0) DEFAULT THEME FIX - core/theme/theme_mode_controller.dart:
+    - build() now returns ThemeMode.light instead of ThemeMode.system.
+    - _load() no longer has a 'system' branch in its saved-pref switch -
+      only 'dark' maps to dark, everything else (including no saved pref)
+      is light. ThemeMode.system as an enum value still technically exists
+      in Flutter but this controller never emits it anymore.
+    - features/settings/settings_screen.dart _appearanceCard(): removed the
+      now-dead `themeMode == ThemeMode.system && platformBrightnessOf(...)`
+      branch from the isDark calculation - simplified to
+      `themeMode == ThemeMode.dark`.
+
+  1) SHARED WIDGETS (features/onboarding/onboarding_widgets.dart, NEW):
+    - FieldLabel - bold black label above a field (old app's convention
+      throughout onboarding; matches the Auth screen's Phase-1 style,
+      which onboarding had never been updated to use).
+    - DropdownSheetField - the old app's "tap to select..." control: an
+      outlined box that expands an inline white rounded options list below
+      it (not a modal), each row optionally emoji-suffixed, selected row
+      highlighted solid gold. When `removable: true` and a value is
+      selected, renders as a solid pink pill with a white X instead (matches
+      the old app's post-selection look on marital-status/orientation/
+      interested-in).
+    - WarningBanner - the amber "exact birthday" warning box under Step 1's
+      date field.
+
+  2) STEP 1 - "About You" (features/onboarding/profile_setup_screen.dart,
+     REWRITTEN top to bottom):
+    - Added the silhouette-icon-style header (emoji instead of a photo
+      placeholder graphic, since no such asset exists - close enough to the
+      old app's icon in spirit without fabricating a bespoke illustration
+      asset).
+    - Birthday field: on selection, shows a separate pink pill badge to the
+      right ("32 / YEARS OLD", two-line) instead of inline text.
+    - Added the amber "Enter the exact birthday shown on your National ID..."
+      warning banner - previously entirely absent.
+    - REPLACED the wrong "Gender" chip-row field (which was actually mapped
+      to marital status conceptually) with the CORRECT 3 old-app fields:
+      "I am a..." (marital status: Single/Dating/Searching/Divorced/Married/
+      Widowed, DropdownSheetField, removable pill), "My orientation"
+      (Straight/Gay/Lesbian/Bisexual, same control), "I'm interested in
+      seeing" (Men/Women/Everyone, same control). The old "Show me" 3-chip
+      row is gone - superseded by "interested in seeing".
+    - profiles PATCH on finish now writes marital_status/orientation/
+      interested_in instead of gender/interested_in - gender itself is no
+      longer collected in onboarding (the old app's onboarding screens never
+      ask for it either).
+
+  3) STEP 2 - "Add Your Photos" (was: 1 optional avatar + 3 optional gallery
+     slots; now: 3 MANDATORY photos, one at a time, matching the old app
+     exactly):
+    - _mandatoryPhotoCount = 3 (was the 4-photo-cap model). Each upload is
+      face-validated on-device via the SAME ML Kit check used everywhere
+      else in the app (NoFaceDetectedException) - the old app's "AI
+      verification runs on every upload" copy now appears verbatim as
+      footer text, but no separate/new verification service was built; it's
+      the existing on-device check, labeled to match the old app's wording.
+    - Per-photo progress header ("Photo N/3", "N/3 verified"), a 3-segment
+      progress bar SEPARATE from the main 4-step wizard progress bar,
+      "Not uploaded" pill, large 220px dashed-bordered circular upload
+      target with camera icon, then 3 small square thumbnails below with
+      green border + green "Verified" caption once filled and a red X badge
+      to remove/redo a slot.
+    - The old flow's "avatar is optional, gallery is optional" framing is
+      gone entirely - all 3 photos block Next until uploaded
+      (_validateStep case 1).
+
+  4) STEP 3 - "Your Location" (was: merged into the last step alongside a
+     manual Country dropdown + City text field; now: its OWN standalone
+     step, GPS-only, no manual fields at all - matches the old app exactly):
+    - Large pin emoji header, "Your Location" / "We use your device location
+      to find people near you." copy verbatim.
+    - Single full-width pill button cycling through 3 visual states:
+      outlined "Use My Current Location" -> filled amber "Detecting..." (via
+      the REAL geolocator call added last session, unchanged) -> filled gold
+      "Update My Location" once captured.
+    - Result renders as a white card below the button: pin icon + bold
+      label + gray circular X to clear.
+    - HONEST GAP, flagged in code comments: the old app's result shows
+      "Kabianga ward, Kenya" (a real reverse-geocoded place name). No
+      reverse-geocoding service is wired anywhere in this app - faking a
+      ward/city name from raw coordinates would violate the project's
+      "never fake data" rule that's been enforced everywhere else this
+      whole UI-parity effort. The result card instead shows the raw
+      lat/lng coordinates (e.g. "-0.3667, 35.2833") until a real geocoding
+      service is added. Country/city TEXT FIELDS were REMOVED from
+      onboarding entirely (the old app's location step has none) - country/
+      city columns on `profiles` are simply not set by onboarding anymore;
+      they stay whatever they defaulted to (empty string, per the live
+      schema's default) until a future profile-edit flow sets them.
+    - Location step no longer blocks Next (_validateStep case 2 returns
+      null unconditionally) - matches the old app having no visible
+      required-state enforcement on this step either.
+
+  5) STEP 4 - "Interests & Goals" (was: split into 2 different steps -
+     "About me" [bio+interests+goal] as our old Step 3, this content never
+     existed as its own combined step; now: ONE step, goal + hobbies
+     combined, matching the old app; the bio field is GONE):
+    - REMOVED the bio TextField entirely - the old app's onboarding never
+      asks for a bio anywhere across all 4 steps. (bio remains a Profile
+      model field with no backing DB column regardless - unaffected.)
+    - Goal picker converted from ChoiceChip row to the same
+      DropdownSheetField pattern as Step 1, with the old app's exact 6
+      option strings + emoji ("Looking for a lover 💕", "Need a serious
+      relationship 💍", "Looking for genuine connections 🤝", "Just here to
+      make friends 👋", "Looking for something casual 🌸", "Open to
+      anything 🌈") - previously we used a different, shorter, non-matching
+      list (Long-term/Dating/Friendship/Casual).
+    - Hobbies: new custom _HobbyPicker widget (not FilterChip/Wrap) -
+      "Tap to select hobbies..." trigger that expands a white card of
+      emoji-suffixed pill chips in a wrap grid (Coffee Lover ☕, Travel
+      Enthusiast ✈️, Photography 📸, Yoga 🧘, Music 🎵, Hiking 🥾, Cooking
+      🍳, Fitness 💪, Art 🎨, Reading 📚, Dancing 💃, Gaming 🎮, Surfing 🏄,
+      Movies 🎬, Dogs 🐕, Cats 🐱, Wine 🍷 - replaced the old, smaller,
+      non-emoji interest list). Selected hobbies also render as removable
+      pink pills ABOVE the trigger, matching the old app's "Surfing X"
+      summary row.
+    - Final button changed from plain "Finish" to gradient "Start Matching
+      🚀" (GradientButton, matching the old app's CTA style + copy exactly;
+      previously onboarding used a flat Material FilledButton, inconsistent
+      with the rest of the app's Phase-1-rebuilt screens).
+
+  6) GLOBAL onboarding chrome changes:
+    - Scaffold backgroundColor explicitly set to AppColors.bgLight (pale
+      pink wash) on every step - was relying on ThemeData's default before.
+    - Removed the AppBar("Complete your profile") entirely - the old app's
+      wizard has no app bar at all, just the progress bar floating on the
+      pink background.
+    - Back/Next buttons restyled: Back is now a StadiumBorder OutlinedButton
+      (was default Material rounded-rect), Next/Continue is now
+      GradientButton (was flat FilledButton) on every step, matching the
+      old app's fully-rounded glowing-pink CTA convention used elsewhere in
+      the app (Auth screen, InfoModals) but never applied to onboarding
+      until now.
+
+  7) 90-DAY DATA POLICY MODAL (shared/widgets/info_modals.dart
+     InfoModals.dataPolicy, NEW) - pops up once over the Auth/Login screen
+     on every fresh app open (features/auth/auth_screen.dart initState +
+     addPostFrameCallback), matching the old app's screenshot exactly: 📌
+     "90-Day Data Policy" title, X-close top-right, pale-pink info box with
+     the verbatim old-app copy about 90-day auto-deletion + same-email
+     resignup, solid gradient "I Understand" button. NOT persisted across
+     app launches (no SharedPreferences flag) - shows every cold start,
+     matching what the screenshot's context implies (session-scoped, not a
+     one-time-ever dismiss).
+
+  8) EMAIL VERIFICATION SCREEN (features/auth/email_verified_screen.dart,
+     REWRITTEN) - was a static "Email verified!" landing screen; now a real
+     6-digit OTP code-entry UI matching the old app's screenshots exactly:
+     pink circular mail-icon header, "Verify Your Email" + the sent-to email
+     interpolated into the body text, 6 individual digit boxes with
+     auto-advance focus, a live MM:SS countdown starting at 9:53 (matches
+     the old app's shown value), a "Don't see it? Check Spam/Promotions..."
+     info box, side-by-side "Paste Code" (reads the clipboard, splits digits
+     into the boxes) and "Resend" (only enabled once the countdown hits
+     zero) buttons, and a gradient "Verify" button.
+     ⚠️ EXPLICITLY UI-ONLY, PER USER INSTRUCTION ("do not make it so that if
+     the user can add any widget, it will go forward - we will add the
+     backend later"): there is NO verifyOTP()/backend call anywhere in this
+     screen. The Verify button stays disabled (onPressed: null) until all 6
+     digits are filled - filling the digits does NOT navigate anywhere or
+     mark anything verified; tapping the enabled button shows an honest "not
+     available yet - backend not built" SnackBar instead of faking success.
+     "Resend" does the same. This is deliberate: Supabase "Confirm email" is
+     currently disabled server-side project-wide (per CLAUDE.md's earlier
+     bugfix note) and no OTP-verification RPC/edge function exists to call,
+     so wiring this for real would require both a dashboard config change
+     and a backend contract this session doesn't have. Revisit once both
+     exist.
+
+  Result / verification (ALL GREEN, correct --dart-define flags used this
+  time - see the prior FIX entry above about the black-screen APK):
+    - flutter analyze -> No issues found beyond the same 4 pre-existing-style
+      info lints (use_null_aware_elements, unrelated, unchanged).
+    - flutter test -> All tests passed (2, unchanged).
+    - flutter build apk --debug --dart-define=SUPABASE_URL=...
+      --dart-define=SUPABASE_ANON_KEY=... -> SUCCESS. Verified (not just
+      trusted) by extracting kernel_blob.bin from the built APK and
+      confirming the Supabase URL string is actually embedded.
+  NOT run on-device - this is the largest single UI change of the whole
+  UI-parity effort; strongly recommend a full manual walkthrough of all 4
+  onboarding steps + the 90-day modal + the OTP screen before considering
+  this done. Known honest gaps left in code comments: no reverse-geocoding
+  (Step 3 shows raw coordinates, not a place name), OTP screen has zero
+  backend wiring by design.
+
+[2026-07-11] FIX: Discover card - action row + photo rail didn't match the old app
+  User sent a screenshot that turned out to be the OLD APP'S OWN reference
+  image (not our app) and asked me to compare our code against it directly
+  rather than eyeball a claimed bug - good instinct, since the button order/
+  colors already matched and there was nothing wrong to "see". Read the full
+  discover_screen.dart source and diffed it precisely against
+  IMG-20260709-WA0034.jpg / WA0050.jpg. Found 2 real, code-verifiable
+  layout differences:
+    1. Action row (X/star/chat/heart) was a SEPARATE sibling widget in the
+       outer ListView, placed below the card with a 20px gap - rendering on
+       the pink page background. In the reference the row sits INSIDE the
+       black photo card, below the "Show more" chip, with the card's
+       rounded black boundary still visible around it - the pink background
+       only starts after the buttons.
+    2. Multi-photo navigation was a vertical column of small numbered
+       circles INSIDE the card's right edge. The reference instead shows a
+       single translucent circular ">" arrow button vertically centered on
+       the card's right edge (photo advance), with the numbered thumbnails
+       (1/2/3, badge-numbered) floating OUTSIDE the card to its right, over
+       the pink page background - not inside it at all.
+  Fix - lib/features/discover/discover_screen.dart:
+    - Removed the standalone _actionRow() call + its SizedBox(height: 20)
+      gap from the outer ListView's children.
+    - Moved _actionRow(p) to the end of the bottom-content Positioned
+      Column inside the card's Stack (after "Show more"), so it now
+      renders inside the card, matching the reference exactly.
+    - Increased the card's AspectRatio from 3/4 (0.75) to 0.62 - taller,
+      to fit the action row inside without cramping the photo/text content.
+      (Old 3/4 was sized for a card with no buttons inside it.)
+    - _card()'s return type changed from a single GestureDetector/
+      AnimatedContainer tree to an outer Stack(clipBehavior: Clip.none)
+      wrapping that same draggable card PLUS a new sibling Positioned
+      (right: -8, top: 100) rendering the numbered-thumbnail column outside
+      the card's clipped bounds - each thumbnail is now a 40px circular
+      avatar with a small black-circle numbered badge (1/2/3) bottom-right,
+      instead of the old small 30px plain-bordered circles that lived
+      inside the card.
+    - Inside the card, the old numbered-rail Positioned block was replaced
+      with a single centered-right translucent circle (34px, chevronRight
+      icon, black45 fill) that calls the same advancePhoto() as before.
+    - Removed the GestureDetector(onTap: advancePhoto) that used to wrap
+      the whole photo image (tap-anywhere-on-photo-to-advance) - now
+      advancing is only via the dedicated arrow button or the thumbnail
+      rail, matching the reference's single-button navigation pattern
+      rather than a tap-anywhere affordance the reference doesn't show.
+  Not changed (flagged, not fixed - a documented decision, not a bug): the
+    "10h ago" last-active pill visible in the reference is still
+    deliberately omitted - no user_presence.last_seen data exists to back
+    it, and fabricating a value would violate the "never fake data" rule
+    enforced everywhere else this session. Same for "Approx" GPS-accuracy
+    badge (no accuracy field anywhere). Both remain [Phase 2 data gap]
+    comments in the code, unchanged by this fix.
+  Result: flutter analyze clean on the file and project-wide (same 4 pre-
+    existing-style info lints, unrelated). flutter test green (2). flutter
+    build apk --debug --dart-define=... -> SUCCESS, verified by extracting
+    kernel_blob.bin and confirming the Supabase URL is embedded (per the
+    black-screen-APK lesson from the prior session). NOT run on-device -
+    recommend visually comparing the rebuilt Discover card against
+    WA0034/WA0050 side-by-side on a real screen.
