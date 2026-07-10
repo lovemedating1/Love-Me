@@ -8,9 +8,9 @@ import 'match_repository.dart';
 /// A conversation resolved for display: the live `conversations` row plus
 /// the other participant's profile and a preview of the latest message.
 ///
-/// `conversations.last_message_id`/`last_message_at` are NOT populated yet
-/// (no trigger wires them up — migration_003.md §4 note), so the preview is
-/// fetched by querying `messages` directly, sorted by `created_at`.
+/// `conversations.last_message_id`/`last_message_at` are NOT reliably
+/// populated, so the preview is fetched by querying `messages` directly,
+/// sorted by `created_at`.
 class ConversationSummary {
   const ConversationSummary({
     required this.conversation,
@@ -27,11 +27,16 @@ class ConversationSummary {
 
 /// Conversations — live against `conversations` (migration 005_chat.sql).
 ///
-/// RLS grants SELECT/UPDATE only, no INSERT: there is no trigger yet to
-/// auto-create a conversation when a match forms. A conversation only exists
-/// if backend created one out-of-band (service-role). [forPartner] returns
-/// `null` when none exists yet — callers (the Chat screen) must handle that
-/// as a distinct "chat not available yet" state, not an error.
+/// RLS grants SELECT/UPDATE only, no client INSERT — but a `conversations`
+/// row is now created automatically by the live `create_conversation_on_match`
+/// trigger (migration 011, `SECURITY DEFINER`) the moment a match forms
+/// (deployed & verified 2026-07-10). So every active match has a conversation.
+///
+/// [forPartner] returning `null` therefore means one of: the match row hasn't
+/// propagated to this client yet (transient — retry), or there is genuinely
+/// no active match with that user. It is NO LONGER the expected steady state
+/// for a fresh match, so callers should treat it as "loading/retry", not a
+/// permanent "chat unavailable" wall.
 abstract interface class ConversationRepository {
   Future<List<ConversationSummary>> conversationsForMe();
   Future<Conversation?> forPartner(String partnerUserId);

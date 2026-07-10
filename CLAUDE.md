@@ -296,11 +296,59 @@ has a screen today. `image_picker` + `google_mlkit_face_detection` +
 - Deferred media spots (need new screens/backend): video profile, ID/selfie
   verification, Wise receipt; chat emoji picker; iOS Info.plist usage strings.
 
-The next slice is whatever migration lands next, or wiring unmatch/block into
-the Matches tab UI, the Calls tab/UI on top of `CallRepository`, or the real
-`notification_preferences` toggles into Settings. Reconcile plan names before
-touching Subscription. Two comprehensive gap docs now exist:
-`app doctumant/FRONTEND_REMAINING.md` + `BACKEND_REMAINING.md`.
+**MEDIA / MATCHING BACKEND WENT LIVE — client reconciled (2026-07-10).** The
+backend team deployed & verified migrations 009-019 (see their deploy memo). This
+closed three things the client had been coding around as "not built yet":
+- **5 Storage buckets + 16 RLS policies are LIVE** — photo/gallery/chat-media/voice
+  uploads now work for real (the client's real `uploadBinary` path was always there;
+  it just 404'd at the storage layer before). No more placeholder URLs.
+- **Mutual-like → match → conversation triggers are LIVE** (`create_match_on_mutual_like`
+  + `create_conversation_on_match`, `SECURITY DEFINER`). A mutual like now creates the
+  match + conversation automatically; the Likes realtime "It's a Match!" overlay fires
+  for real, and every match immediately has a working chat.
+- Client changes made this session: removed the stale "trigger hasn't shipped / chat
+  not available yet" scaffolding across `swipe_repository`/`match_repository`/
+  `conversation_repository`/`chat_repository`/`chat_screen`/`discover_screen`; the
+  Chat screen's null-conversation state is now a transient "Setting up your chat… /
+  Retry", not a permanent wall. **Chat media now stores object PATHS** (not 7-day
+  signed URLs) in `messages.media_url`/`thumbnail_url` and mints a fresh 1-hour signed
+  URL at render time (`ChatRepository.signedUrlFor` + the `_MediaThumb` widget) — fixes
+  the "media 403s after 7 days" problem (deploy memo open Q1, option a). A legacy
+  http(s) value in those columns is passed through unchanged for back-compat.
+- **Still the one media launch blocker:** `moderate-image` (server NSFW/human gate) is
+  **not built** — uploads aren't scanned server-side. See `BACKEND_REMAINING.md` [BE-5].
+
+**UI PARITY TRACK WITH THE OLD APP — COMPLETE (2026-07-10, Phases 0-5).** The old
+app's screenshots live in `app doctumant/old app ss/`. Two docs drove this work:
+- **`app doctumant/UI_GAP_ANALYSIS.md`** — full screen-by-screen diff (old vs ours).
+- **`app doctumant/UI_REBUILD_PLAN.md`** — the 5-phase executable plan + Progress
+  Tracker, now showing **Phase 0-4 fully done, Phase 5 done except §5.1**.
+- ✅ **The plan-name conflict is RESOLVED:** `SubscriptionPlan`/`MockData.plans` now
+  carry the real 5 tiers — Basic+ $5/500/Silver, Gold $10/1000/Gold, Platinum
+  $15/1500/Diamond, Premium Elite $20/2000/Crown, VIP Elite $25/Unlimited/VIP.
+- 🔴 **Still open — the one remaining front-end launch blocker:** legal copy
+  (`features/legal/legal_screen.dart`) is still lorem ipsum. The user explicitly
+  deferred supplying real Terms/Privacy/Refund/Child-Safety text (incl. the Google
+  Play CSAE statement) — ask for it before shipping to the Play Store.
+- Every screen in `lib/features/` was rebuilt or restructured to match the
+  screenshots: design tokens/header/nav/auth (Phase 1), Discover (Phase 2),
+  Profile/Likes/Explore (Phase 3), Settings/Subscription/Messages/Chat (Phase 4),
+  the 4 remaining modals (`shared/widgets/info_modals.dart`) + Delete
+  Account/Devices/Notifications simplification + dead-code cleanup (removed the
+  Admin screen, `placeholder_screen.dart`, `maxGalleryPhotos`) + a dark-mode
+  hardcoded-color audit/fix across 11 screens (Phase 5).
+- **Standing rule that shaped every phase:** when data doesn't exist yet, **hide the
+  UI element** — never fake a number. Several elements (the header's 📅 account-
+  expiry pill, Discover's "last active"/"Approx" GPS badge, Explore's country RPC
+  counts, chat block/report) still render nothing or a "coming soon" toast for
+  exactly this reason — see `BACKEND_REMAINING.md` for what unblocks each one.
+- **Not yet done:** a live `flutter run` walkthrough — this whole 5-phase effort was
+  verified via `flutter analyze`/`test`/`build apk --debug` only, never on a real
+  emulator/device. Do that pass (incl. toggling Dark Mode) before considering the
+  UI track fully signed off.
+
+Other gap docs: `app doctumant/FRONTEND_REMAINING.md` + `BACKEND_REMAINING.md`
+(backend hand-off for media/storage: `BACKEND_MEDIA_REQUIREMENTS.md`).
 
 **Tooling note (Windows):** Flutter SDK **3.44.4 / Dart 3.9** lives at **`C:\flutter`**
 (moved off `D:\app dev\tute\flutter` because the space in that path broke the
@@ -311,8 +359,9 @@ IS at `C:\Program Files\Git\cmd`. Flutter needs git, so run everything in ONE co
 C++ workload we don't have — irrelevant; target is Android/web. Icons use
 `lucide_icons_flutter` (the old `lucide_icons` is incompatible with Flutter 3.44).
 
-**Locked:** palette = pink `#E6287A` + gold `#FFB800` (Roboto, 448px max width).
-Plan-name conflict remains deferred (placeholder tiers in Phase 3).
+**Locked:** palette = pink `#FF1F8E` + gold `#FFB800` (Roboto, 448px max width;
+warmed from the original `#E6287A` in Phase 1 to match the old app). Plan names are
+resolved (see above) — Basic+/Gold/Platinum/Premium Elite/VIP Elite are final.
 
 ## The source of truth
 
@@ -352,10 +401,15 @@ running build journal.
 
 ## Unresolved decisions (raise with user before building the affected area)
 
-- **Plan names** conflict: Backend doc = Premium/VIP/Elite; roadmap = Free/Basic+/Gold/
-  Platinum/Premium Elite/VIP Elite. Resolve before SubscriptionScreen.
-- **Palette** drift between docs. README/target uses pink `#E6287A` + gold `#FFB800`,
-  Roboto, 448px max-width. Confirm one canonical `AppColors` set before theming.
+- **Legal copy** is still lorem ipsum (Play Store launch blocker) — user must supply
+  real Terms/Privacy/Refund/Child-Safety text (incl. the Google Play CSAE statement).
+  See "UI PARITY TRACK" above and Phase 5.1 in `UI_REBUILD_PLAN.md`.
+- **Free tier's profile limit** — the other 5 plan tiers are locked (see above), but
+  the Free tier's monthly profile-view cap was never confirmed. Ask before it matters
+  (e.g. enforcing a real free-tier gate server-side).
+
+*(Plan names and palette, previously listed here as unresolved, were locked in the
+2026-07-10 UI-parity track — see above.)*
 
 ## Conventions when you do start building
 

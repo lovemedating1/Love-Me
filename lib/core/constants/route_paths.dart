@@ -30,9 +30,6 @@ class RoutePaths {
   static const String refund = '/refund-policy';
   static const String childSafety = '/child-safety';
 
-  // Admin
-  static const String admin = '/admin/diagnostics';
-
   /// Build a concrete chat path from a partner id.
   static String chatTo(String id) => '/chat/$id';
 }

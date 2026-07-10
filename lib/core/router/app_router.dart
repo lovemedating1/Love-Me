@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../features/admin/admin_diagnostics_screen.dart';
 import '../../features/auth/auth_controller.dart';
 import '../../features/auth/auth_screen.dart';
 import '../../features/auth/email_verified_screen.dart';
@@ -11,7 +9,6 @@ import '../../features/auth/reset_password_screen.dart';
 import '../../features/chat/chat_screen.dart';
 import '../../features/delete_account/delete_account_screen.dart';
 import '../../features/devices/devices_screen.dart';
-import '../../features/discover/discover_filters_sheet.dart';
 import '../../features/discover/discover_screen.dart';
 import '../../features/explore/explore_screen.dart';
 import '../../features/legal/legal_screen.dart';
@@ -24,7 +21,6 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/safety/safety_reports_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/subscription/subscription_screen.dart';
-import '../../shared/widgets/app_header.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../constants/route_paths.dart';
 import 'router_guards.dart';
@@ -115,11 +111,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: RoutePaths.childSafety,
           builder: (_, _) => LegalScreen.childSafety()),
-
-      // ---- Admin --------------------------------------------------------
-      GoRoute(
-          path: RoutePaths.admin,
-          builder: (_, _) => const AdminDiagnosticsScreen()),
     ],
     errorBuilder: (_, _) => const NotFoundScreen(),
   );
@@ -140,22 +131,14 @@ String _titleFor(String location) {
   }
 }
 
-/// Discover gets a Filters action next to the bell; other tabs use the default.
+/// Extra trailing header actions, shown *before* the bell (which AppHeader
+/// now renders on every tab).
+///
+/// Phase 2: the old app has no header filter button on Discover — the
+/// search-radius chip lives on the Discover body instead (see
+/// `discover_screen.dart`'s `_aboveCard()`), so there are no extra actions
+/// there anymore.
 List<Widget> _headerActionsFor(BuildContext context, String loc) {
-  if (loc == RoutePaths.discover) {
-    return [
-      HeaderAction(
-        icon: LucideIcons.slidersHorizontal,
-        tooltip: 'Filters',
-        onTap: () => DiscoverFiltersSheet.show(context),
-      ),
-      HeaderAction(
-        icon: LucideIcons.bell,
-        tooltip: 'Notifications',
-        onTap: () => context.push(RoutePaths.notifications),
-      ),
-    ];
-  }
   return const [];
 }
 

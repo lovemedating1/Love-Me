@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../shared/widgets/gradient_button.dart';
 import 'discover_providers.dart';
 
-/// Bottom sheet for Discover feed filters (age, distance, gender, toggles).
+/// Search-radius bottom sheet (old app: `4`/`WA0030`) — Worldwide toggle,
+/// a big "N km" readout, a slider, and 9 preset chips. Replaces the old
+/// generic age/gender/online filters sheet per UI_REBUILD_PLAN.md §2.5.
 class DiscoverFiltersSheet extends ConsumerStatefulWidget {
   const DiscoverFiltersSheet({super.key});
 
@@ -20,7 +24,14 @@ class DiscoverFiltersSheet extends ConsumerStatefulWidget {
 }
 
 class _DiscoverFiltersSheetState extends ConsumerState<DiscoverFiltersSheet> {
-  late DiscoverFilters _draft = ref.read(discoverFiltersProvider);
+  late bool _worldwide = ref.read(worldwideSearchProvider);
+  late int _radiusKm = ref.read(searchRadiusKmProvider);
+
+  void _apply() {
+    ref.read(worldwideSearchProvider.notifier).state = _worldwide;
+    ref.read(searchRadiusKmProvider.notifier).state = _radiusKm;
+    Navigator.of(context).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,87 +46,54 @@ class _DiscoverFiltersSheetState extends ConsumerState<DiscoverFiltersSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Filters', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Text('Age: ${_draft.minAge} – ${_draft.maxAge}'),
-          RangeSlider(
-            min: 18,
-            max: 80,
-            divisions: 62,
-            values: RangeValues(
-                _draft.minAge.toDouble(), _draft.maxAge.toDouble()),
-            labels: RangeLabels('${_draft.minAge}', '${_draft.maxAge}'),
-            onChanged: (v) => setState(() => _draft = _draft.copyWith(
-                minAge: v.start.round(), maxAge: v.end.round())),
-          ),
-          Text('Distance: up to ${_draft.maxDistanceKm.round()} km'),
-          Slider(
-            min: 1,
-            max: 500,
-            divisions: 499,
-            value: _draft.maxDistanceKm,
-            label: '${_draft.maxDistanceKm.round()} km',
-            onChanged: (v) =>
-                setState(() => _draft = _draft.copyWith(maxDistanceKm: v)),
-          ),
-          const SizedBox(height: 8),
-          Text('Show me', style: theme.textTheme.titleMedium),
-          Wrap(
-            spacing: 8,
-            children: [
-              _genderChip('Everyone', null),
-              _genderChip('Men', 'male'),
-              _genderChip('Women', 'female'),
-            ],
-          ),
+          Text('Search Radius', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 16),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Online only'),
-            value: _draft.onlineOnly,
-            onChanged: (v) =>
-                setState(() => _draft = _draft.copyWith(onlineOnly: v)),
+            title: const Text('🌍 Worldwide',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('See profiles from anywhere in the world'),
+            value: _worldwide,
+            onChanged: (v) => setState(() => _worldwide = v),
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Verified only'),
-            value: _draft.verifiedOnly,
-            onChanged: (v) =>
-                setState(() => _draft = _draft.copyWith(verifiedOnly: v)),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () {
-                    ref.read(discoverFiltersProvider.notifier).reset();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Reset'),
-                ),
+          if (!_worldwide) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                '$_radiusKm km',
+                style: theme.textTheme.headlineMedium
+                    ?.copyWith(fontWeight: FontWeight.w800, color: AppColors.pink),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    ref.read(discoverFiltersProvider.notifier).set(_draft);
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Apply'),
-                ),
-              ),
-            ],
+            ),
+            Slider(
+              min: 5,
+              max: 5000,
+              value: _radiusKm.toDouble().clamp(5, 5000),
+              label: '$_radiusKm km',
+              onChanged: (v) => setState(() => _radiusKm = v.round()),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final preset in kRadiusPresetsKm)
+                  ChoiceChip(
+                    label: Text('$preset km'),
+                    selected: _radiusKm == preset,
+                    onSelected: (_) => setState(() => _radiusKm = preset),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ] else
+            const SizedBox(height: 12),
+          GradientButton(
+            label: _worldwide ? 'Apply worldwide' : 'Apply',
+            onPressed: _apply,
           ),
         ],
       ),
     );
   }
-
-  Widget _genderChip(String label, String? value) => ChoiceChip(
-        label: Text(label),
-        selected: _draft.gender == value,
-        onSelected: (_) => setState(() => _draft = value == null
-            ? _draft.copyWith(clearGender: true)
-            : _draft.copyWith(gender: value)),
-      );
 }

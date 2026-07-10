@@ -8,20 +8,22 @@ import '../../core/media/photo_picker_service.dart';
 import '../../core/media/photo_source_sheet.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
 import '../../shared/data/repositories.dart';
 import '../../shared/models/profile.dart';
-import '../../shared/models/profile_photo.dart';
 import '../../shared/widgets/app_avatar.dart';
+import '../../shared/widgets/app_chip.dart';
 import '../../shared/widgets/state_views.dart';
 import '../auth/auth_controller.dart';
 
-/// Gallery is capped at 4 photos total — the hard `display_order` (1-4)
-/// constraint on `profile_photos`, not the front-end AppConstants figure.
-const _maxProfilePhotos = 4;
-
-/// 10 — ProfilePage (tab body). Own profile summary + entry to settings,
-/// subscription, safety, sign out.
+/// 10 — ProfilePage (tab body).
+///
+/// Rebuilt for UI parity (Phase 3, `WA0045`) — see UI_REBUILD_PLAN.md §3.2.
+/// Per Phase 0 §0.4 (match the old app exactly), this REMOVES the stats row,
+/// the 4-photo gallery grid, the "Premium (demo toggle)" switch, and the
+/// bio block — none of those exist in the old app's Profile tab. Photo
+/// changes now happen only via the avatar's camera badge.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -39,149 +41,169 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _content(BuildContext context, WidgetRef ref, Profile p, bool isPremium) {
-    final theme = Theme.of(context);
     return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        _banner(context, ref, p, isPremium),
-        const SizedBox(height: 12),
-        _statsRow(theme, ref),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: OutlinedButton.icon(
-            onPressed: () => _editSheet(context, ref, p),
-            icon: const Icon(LucideIcons.pencil),
-            label: const Text('Edit Profile'),
-          ),
-        ),
-        if (!isPremium)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _upgradeCard(context),
-          ),
-        const SizedBox(height: 8),
-        if (p.bio != null)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(p.bio!, style: theme.textTheme.bodyMedium),
-          ),
-        _gallerySection(context, ref),
-        const Divider(height: 24),
-        // Demo toggle so the free/premium gates are testable without a backend.
-        SwitchListTile(
-          secondary: const Icon(LucideIcons.crown, color: AppColors.gold),
-          title: const Text('Premium (demo toggle)'),
-          subtitle: const Text('Mock — flips free/premium gates'),
-          value: isPremium,
-          onChanged: (v) => ref.read(isPremiumProvider.notifier).state = v,
-        ),
-        _row(context, LucideIcons.settings, 'Settings', RoutePaths.settings),
-        _row(context, LucideIcons.bell, 'Notifications', RoutePaths.notifications),
-        _row(context, LucideIcons.monitor, 'Devices', RoutePaths.devices),
-        _row(context, LucideIcons.shield, 'Safety Reports', RoutePaths.safetyReports),
-        _row(context, LucideIcons.crown, 'Manage Subscription', RoutePaths.subscription),
-        const Divider(height: 24),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(foregroundColor: AppColors.destructive),
-            icon: const Icon(LucideIcons.logOut),
-            label: const Text('Log out'),
-            onPressed: () => ref.read(authControllerProvider.notifier).signOut(),
-          ),
-        ),
-        Center(
-          child: TextButton(
-            onPressed: () => context.push(RoutePaths.deleteAccount),
-            child: const Text('Delete account',
-                style: TextStyle(color: AppColors.destructive)),
-          ),
-        ),
-        const SizedBox(height: 24),
+        _profileCard(context, ref, p),
+        const SizedBox(height: 14),
+        if (isPremium) _managePlanCard(context, p),
+        if (!isPremium) _upgradeCard(context),
+        const SizedBox(height: 14),
+        _rowsCard(context, ref),
       ],
     );
   }
 
-  Widget _banner(
-      BuildContext context, WidgetRef ref, Profile p, bool isPremium) {
+  // ---- White profile card -------------------------------------------------
+
+  Widget _profileCard(BuildContext context, WidgetRef ref, Profile p) {
     final theme = Theme.of(context);
     return Container(
-      decoration: const BoxDecoration(gradient: AppGradients.header),
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-      child: Row(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: Stack(
         children: [
-          Stack(
-            children: [
-              AppAvatar(photoUrl: p.photoUrl, size: 84, isVerified: p.isVerified),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: GestureDetector(
-                  onTap: () => _changeAvatar(context, ref),
-                  child: const CircleAvatar(
-                    radius: 14,
-                    backgroundColor: Colors.white,
-                    child: Icon(LucideIcons.camera,
-                        size: 14, color: AppColors.pink),
-                  ),
-                ),
-              ),
-            ],
+          Positioned(
+            top: 0,
+            right: 0,
+            child: _pencilFab(context, ref, p),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text('${p.name}, ${p.ageLabel}',
-                          style: theme.textTheme.headlineMedium
-                              ?.copyWith(color: Colors.white)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(width: double.infinity),
+              Stack(
+                children: [
+                  AppAvatar(photoUrl: p.photoUrl, size: 88, isVerified: p.isVerified),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: GestureDetector(
+                      onTap: () => _changeAvatar(context, ref),
+                      child: const CircleAvatar(
+                        radius: 15,
+                        backgroundColor: Colors.white,
+                        child: Icon(LucideIcons.camera,
+                            size: 15, color: AppColors.pink),
+                      ),
                     ),
-                    if (isPremium) ...[
-                      const SizedBox(width: 8),
-                      const Icon(LucideIcons.crown, color: AppColors.gold),
-                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text('${p.name}, ${p.ageLabel}',
+                  style: theme.textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text('📍 ${p.city}, ${p.country}',
+                  style: const TextStyle(color: AppColors.mutedFg)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  const AppChip(
+                      label: 'Location is on',
+                      icon: LucideIcons.compass,
+                      tone: AppChipTone.grey,
+                      dense: true),
+                  if (p.isPremium)
+                    AppChip(
+                      label: p.premiumDaysLeft == null
+                          ? 'Premium Active'
+                          : 'Premium Active · ${p.premiumDaysLeft}d left',
+                      emoji: '👑',
+                      tone: AppChipTone.pink,
+                      dense: true,
+                    ),
+                ],
+              ),
+              if (p.relationshipGoal != null) ...[
+                const SizedBox(height: 10),
+                Text('♥ Need a ${p.relationshipGoal}',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+              if (p.hobbies.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final hobby in p.hobbies)
+                      AppChip(label: hobby, tone: AppChipTone.grey, dense: true),
                   ],
                 ),
-                Text('${p.city}, ${p.country}',
-                    style: const TextStyle(color: Colors.white70)),
               ],
-            ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  /// Live counts from `likes` / `matches`. **Views shows "–"**: the
-  /// `profile_views` RLS only exposes views *you made*, not views *of you*,
-  /// so "who viewed me" is not obtainable until a premium RPC exists
-  /// (migration_002.md §5). Showing a dash beats inventing a number.
-  Widget _statsRow(ThemeData theme, WidgetRef ref) {
-    final stats = ref.watch(myStatsProvider);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          _stat(theme, 'Views', null),
-          _stat(theme, 'Likes', stats.valueOrNull?.likes),
-          _stat(theme, 'Matches', stats.valueOrNull?.matches),
-        ],
-      ),
-    );
-  }
-
-  Widget _stat(ThemeData theme, String label, int? value) => Expanded(
-        child: Column(
-          children: [
-            Text(value?.toString() ?? '–', style: theme.textTheme.titleLarge),
-            Text(label, style: theme.textTheme.bodySmall),
-          ],
+  Widget _pencilFab(BuildContext context, WidgetRef ref, Profile p) => Material(
+        color: AppColors.pink,
+        shape: const CircleBorder(),
+        elevation: 2,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => _editSheet(context, ref, p),
+          child: const Padding(
+            padding: EdgeInsets.all(9),
+            child: Icon(LucideIcons.pencil, color: Colors.white, size: 17),
+          ),
         ),
       );
+
+  Widget _managePlanCard(BuildContext context, Profile p) => GestureDetector(
+        onTap: () => context.push(RoutePaths.subscription),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: AppGradients.managePlan,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              const Icon(LucideIcons.crown, color: Colors.white, size: 26),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Current Plan: Gold',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16)),
+                    if (p.premiumUntil != null)
+                      Text(
+                        'Expires ${_formatDate(p.premiumUntil!)}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                  ],
+                ),
+              ),
+              const Icon(LucideIcons.chevronRight, color: Colors.white),
+            ],
+          ),
+        ),
+      );
+
+  String _formatDate(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
+  }
 
   Widget _upgradeCard(BuildContext context) => GestureDetector(
         onTap: () => context.push(RoutePaths.subscription),
@@ -189,8 +211,8 @@ class ProfileScreen extends ConsumerWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-              gradient: AppGradients.premium,
-              borderRadius: BorderRadius.circular(16)),
+              gradient: AppGradients.managePlan,
+              borderRadius: BorderRadius.circular(20)),
           child: const Row(
             children: [
               Icon(LucideIcons.crown, color: Colors.white),
@@ -206,126 +228,53 @@ class ProfileScreen extends ConsumerWidget {
         ),
       );
 
-  Widget _gallerySection(BuildContext context, WidgetRef ref) {
-    final photos = ref.watch(myPhotosProvider);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: photos.when(
-        loading: () => const SizedBox(
-            height: 80, child: Center(child: CircularProgressIndicator())),
-        error: (_, _) => ErrorView(
-            message: 'Could not load photos.',
-            onRetry: () => ref.invalidate(myPhotosProvider)),
-        data: (list) => _gallery(context, ref, list),
-      ),
-    );
-  }
+  // ---- 3 rows: Settings · Safety Reports · Log Out ------------------------
 
-  Widget _gallery(BuildContext context, WidgetRef ref, List<ProfilePhoto> photos) {
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      children: [
-        for (final photo in photos)
-          GestureDetector(
-            onTap: photo.isPrimary ? null : () => _setPrimary(context, ref, photo),
-            onLongPress: () => _deletePhoto(context, ref, photo),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(photo.photoUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          Container(color: const Color(0x22E6287A))),
-                  if (photo.isPrimary)
-                    const Positioned(
-                      top: 4,
-                      left: 4,
-                      child: Icon(LucideIcons.star,
-                          color: AppColors.gold, size: 16),
-                    ),
-                ],
-              ),
+  Widget _rowsCard(BuildContext context, WidgetRef ref) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppTheme.cardShadow,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            _row(context, LucideIcons.settings, 'Settings', RoutePaths.settings),
+            const Divider(height: 1),
+            _row(context, LucideIcons.shield, 'My Safety Reports', RoutePaths.safetyReports),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(LucideIcons.logOut, color: AppColors.destructive),
+              title: const Text('Log Out', style: TextStyle(color: AppColors.destructive)),
+              onTap: () => ref.read(authControllerProvider.notifier).signOut(),
             ),
-          ),
-        if (photos.length < _maxProfilePhotos)
-          GestureDetector(
-            onTap: () => _addPhoto(context, ref, photos),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: const Icon(LucideIcons.plus),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  /// Lets the user take/choose a photo, validates on-device that it contains
-  /// a face (rejecting non-person photos), uploads it to the `avatars` bucket,
-  /// and inserts a `profile_photos` row at the next free slot.
-  Future<void> _addPhoto(
-      BuildContext context, WidgetRef ref, List<ProfilePhoto> existing) async {
-    final source = await showPhotoSourceSheet(context);
-    if (source == null) return;
-
-    final usedSlots = existing.map((p) => p.displayOrder).toSet();
-    final freeSlot = [1, 2, 3, 4].firstWhere((s) => !usedSlots.contains(s));
-    try {
-      final picker = ref.read(photoPickerServiceProvider);
-      final picked = await picker.pickProfilePhoto(source);
-
-      final repo = ref.read(profilePhotoRepositoryProvider);
-      final url = await repo.uploadPhoto(picked.bytes,
-          fileExtension: picked.fileExtension);
-      await repo.addPhoto(
-        photoUrl: url,
-        displayOrder: freeSlot,
-        isPrimary: existing.isEmpty,
+          ],
+        ),
       );
-      ref.invalidate(myPhotosProvider);
-      if (existing.isEmpty) ref.invalidate(currentUserProvider);
-    } on PhotoPickCancelled {
-      // User backed out — no-op.
-    } on NoFaceDetectedException {
-      if (context.mounted) {
-        _toast(
-            context,
-            'That doesn\'t look like a photo of a person. Please upload a '
-            'clear photo of yourself.',
-            error: true);
-      }
-    } on ProfilePhotoSlotTakenException {
-      if (context.mounted) _toast(context, 'That slot is taken — try again.', error: true);
-    } on MediaUploadException catch (e) {
-      if (context.mounted) _toast(context, e.message, error: true);
-    } catch (e) {
-      if (context.mounted) _toast(context, 'Could not add photo: $e', error: true);
-    }
+
+  Widget _row(BuildContext context, IconData icon, String label, String route) =>
+      ListTile(
+        leading: Icon(icon),
+        title: Text(label),
+        trailing: const Icon(LucideIcons.chevronRight, size: 18),
+        onTap: () => context.push(route),
+      );
+
+  // ---- Actions --------------------------------------------------------
+
+  void _editSheet(BuildContext context, WidgetRef ref, Profile p) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _EditProfileSheet(profile: p),
+    );
   }
 
-  Future<void> _setPrimary(
-      BuildContext context, WidgetRef ref, ProfilePhoto photo) async {
-    try {
-      await ref.read(profilePhotoRepositoryProvider).setPrimary(photo.id);
-      ref.invalidate(myPhotosProvider);
-      ref.invalidate(currentUserProvider);
-    } catch (_) {
-      if (context.mounted) {
-        _toast(context, 'Could not set primary photo — try again.', error: true);
-      }
-    }
-  }
-
-  /// Avatar camera badge — pick a new photo (face-validated), upload it, and
-  /// make it the primary. If the gallery is already full (4), the current
-  /// primary is replaced; otherwise the new photo is added at a free slot.
+  /// Avatar camera badge — the sole photo-change entry point now that the
+  /// gallery grid is removed (per Phase 0 §0.4 #4). Picks/validates a face,
+  /// uploads, and makes it primary; replaces the current primary if the
+  /// gallery is already at the 4-photo cap.
   Future<void> _changeAvatar(BuildContext context, WidgetRef ref) async {
     final source = await showPhotoSourceSheet(context);
     if (source == null) return;
@@ -340,7 +289,6 @@ class ProfileScreen extends ConsumerWidget {
       final freeSlot =
           [1, 2, 3, 4].where((s) => !usedSlots.contains(s)).firstOrNull;
 
-      // Gallery full → free the current primary's slot first.
       var slot = freeSlot;
       if (slot == null) {
         final primary = photos.where((p) => p.isPrimary).firstOrNull ??
@@ -357,7 +305,6 @@ class ProfileScreen extends ConsumerWidget {
           fileExtension: picked.fileExtension);
       await repo.addPhoto(photoUrl: url, displayOrder: slot, isPrimary: true);
 
-      ref.invalidate(myPhotosProvider);
       ref.invalidate(currentUserProvider);
     } on PhotoPickCancelled {
       // User backed out — no-op.
@@ -378,19 +325,6 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _deletePhoto(
-      BuildContext context, WidgetRef ref, ProfilePhoto photo) async {
-    try {
-      await ref.read(profilePhotoRepositoryProvider).deletePhoto(photo.id);
-      ref.invalidate(myPhotosProvider);
-      if (photo.isPrimary) ref.invalidate(currentUserProvider);
-    } catch (_) {
-      if (context.mounted) {
-        _toast(context, 'Could not delete photo — try again.', error: true);
-      }
-    }
-  }
-
   void _toast(BuildContext context, String msg, {bool error = false}) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -399,23 +333,6 @@ class ProfileScreen extends ConsumerWidget {
         backgroundColor: error ? AppColors.destructive : AppColors.pink,
         behavior: SnackBarBehavior.floating,
       ));
-  }
-
-  Widget _row(BuildContext context, IconData icon, String label, String route) =>
-      ListTile(
-        leading: Icon(icon),
-        title: Text(label),
-        trailing: const Icon(LucideIcons.chevronRight, size: 18),
-        onTap: () => context.push(route),
-      );
-
-  void _editSheet(BuildContext context, WidgetRef ref, Profile p) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => _EditProfileSheet(profile: p),
-    );
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/route_paths.dart';
+import '../../core/location/location_service.dart';
 import '../../core/media/photo_picker_service.dart';
 import '../../core/media/photo_source_sheet.dart';
 import '../../core/theme/app_colors.dart';
@@ -58,6 +59,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   final _city = TextEditingController();
   bool _locating = false;
   bool _located = false;
+  LocationFix? _locationFix;
 
   bool _submitting = false;
 
@@ -120,6 +122,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     setState(() => _submitting = true);
     final userId = Supabase.instance.client.auth.currentUser!.id;
     try {
+      final fix = _locationFix;
       await Supabase.instance.client.from('profiles').update({
         'name': _name.text.trim(),
         'birthday':
@@ -130,6 +133,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         'hobbies': _interests.toList(),
         'country': _country,
         'city': _city.text.trim(),
+        if (fix != null) 'location_lat': fix.latitude,
+        if (fix != null) 'location_lng': fix.longitude,
+        if (fix != null) 'location_accuracy_m': fix.accuracyMeters,
         'profile_complete': true,
       }).eq('user_id', userId);
       ref.read(authControllerProvider.notifier).markProfileComplete();
@@ -224,16 +230,40 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     }
   }
 
+  /// Captures a real GPS fix via `geolocator` (requests permission if
+  /// needed). Only stores coordinates — country/city stay manual entry
+  /// below since there's no reverse-geocoding service wired yet; faking a
+  /// city name from coordinates would violate the "never fake data" rule.
   Future<void> _useLocation() async {
     setState(() => _locating = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (mounted) {
-      setState(() {
-        _locating = false;
-        _located = true;
-        _country ??= 'Kenya';
-        if (_city.text.isEmpty) _city.text = 'Nairobi';
-      });
+    try {
+      final fix = await ref.read(locationServiceProvider).getCurrentLocation();
+      if (mounted) {
+        setState(() {
+          _locating = false;
+          _located = true;
+          _locationFix = fix;
+        });
+      }
+    } on LocationServiceDisabledException {
+      if (mounted) {
+        setState(() => _locating = false);
+        _toast('Turn on location services to use this.', error: true);
+      }
+    } on LocationPermissionDeniedException catch (e) {
+      if (mounted) {
+        setState(() => _locating = false);
+        _toast(
+            e.permanently
+                ? 'Location permission denied — enable it in system settings.'
+                : 'Location permission denied.',
+            error: true);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _locating = false);
+        _toast('Could not get your location — try again.', error: true);
+      }
     }
   }
 

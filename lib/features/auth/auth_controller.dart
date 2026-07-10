@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../../shared/data/repositories.dart';
+import '../discover/discover_providers.dart';
+
 /// Wraps the live Supabase auth session + the user's `profiles` row
 /// completeness, since routing decisions need both.
 class AuthState {
@@ -107,6 +110,7 @@ class AuthController extends Notifier<AuthState> {
           profileComplete: complete,
           loading: false,
           bootstrapped: true);
+      _invalidateUserScopedProviders();
     } on sb.AuthException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
       rethrow;
@@ -137,6 +141,7 @@ class AuthController extends Notifier<AuthState> {
           profileComplete: false,
           loading: false,
           bootstrapped: true);
+      _invalidateUserScopedProviders();
     } on sb.AuthException catch (e) {
       state = state.copyWith(loading: false, error: e.message);
       rethrow;
@@ -171,6 +176,7 @@ class AuthController extends Notifier<AuthState> {
   Future<void> signOut() async {
     await _client.auth.signOut();
     state = const AuthState(bootstrapped: true);
+    _invalidateUserScopedProviders();
   }
 
   Future<bool> _fetchProfileComplete(String userId) async {
@@ -180,6 +186,35 @@ class AuthController extends Notifier<AuthState> {
         .eq('user_id', userId)
         .maybeSingle();
     return row?['profile_complete'] as bool? ?? false;
+  }
+
+  /// Every cached provider that reads Supabase directly (not derived from
+  /// [authControllerProvider]'s own state) must be invalidated on sign-out
+  /// AND sign-in. Otherwise switching accounts leaves the UI showing the
+  /// previous user's profile/feed/matches/etc. until something else happens
+  /// to invalidate them — Riverpod has no reason to recompute a `FutureProvider`
+  /// just because the underlying Supabase session changed underneath it.
+  void _invalidateUserScopedProviders() {
+    ref.invalidate(currentUserProvider);
+    ref.invalidate(discoverFeedProvider);
+    ref.invalidate(cardPhotosProvider);
+    ref.invalidate(likedYouProvider);
+    ref.invalidate(matchesProvider);
+    ref.invalidate(myMatchRowsProvider);
+    ref.invalidate(conversationsProvider);
+    ref.invalidate(conversationForPartnerProvider);
+    ref.invalidate(messagesProvider);
+    ref.invalidate(profileByIdProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(notificationPreferencesProvider);
+    ref.invalidate(safetyReportsProvider);
+    ref.invalidate(devicesProvider);
+    ref.invalidate(profilesByCountryProvider);
+    ref.invalidate(myPhotosProvider);
+    ref.invalidate(myStatsProvider);
+    ref.invalidate(reactionsProvider);
+    ref.invalidate(callHistoryProvider);
+    ref.invalidate(isPremiumProvider);
   }
 }
 

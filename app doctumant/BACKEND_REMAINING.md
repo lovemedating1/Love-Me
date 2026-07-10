@@ -179,33 +179,42 @@ Unblocks front-end: §14 (Delete Account).
 
 ---
 
-## [BE-8] Storage buckets & media pipeline — 🔴 MISSING (broad blocker)
+## [BE-8] Storage buckets & media pipeline — 🟢 MOSTLY RESOLVED (2026-07-10)
 
-**No storage buckets exist in any delivered migration.** The full spec needs 7:
-`avatars` (public), `email-assets` (public), `chat-files`, `chat-images`,
-`chat-file-thumbs`, `voice-messages`, `wise-proofs` (all private w/ signed URLs).
+**The 5 media buckets are now LIVE and verified** (migrations 015/016, backend deploy
+memo 2026-07-10): `avatars` (public, 5MB, jpeg/png/webp), `chat-images` (private, 10MB),
+`chat-files` (private, 50MB, mp4 video), `chat-file-thumbs` (private, 2MB, jpeg),
+`voice-messages` (private, 10MB, aac). All 16 storage RLS policies live (`avatars`
+public-read + owner-write; chat buckets gated by the live `is_conversation_participant()`
+`SECURITY DEFINER` helper). Profile photos & gallery, chat media, and voice messages now
+upload for real against these buckets — **no more placeholder URLs** (the client's real
+`uploadBinary` path was already built; it just failed at the storage layer before).
 
-Needed:
-- 🔴 Create the buckets + per-bucket RLS/path policies (`<user_id>/…`, `<match_id>/…`).
-- 🔴 Wire `moderate-image` ([BE-5]) to run before any image commit.
-- 🔴 `generate-pdf-thumbnail` edge fn for `chat-files` previews.
+Client change made 2026-07-10 in response: chat media now stores the **object path** in
+`messages.media_url`/`thumbnail_url` (not a 7-day signed URL) and mints a fresh 1-hour
+signed URL at render time (`ChatRepository.signedUrlFor`) — resolves the "media 403s after
+7 days" caveat (deploy memo open Q1, option a).
 
-**This blocks every real image/voice/file feature:** profile photos & gallery (they use
-placeholder URLs today), chat media, voice messages, Wise receipts. Highest-leverage
-backend item after notifications.
+Still open (not blocking basic media):
+- 🔴 Wire `moderate-image` ([BE-5]) — the NSFW/human gate is **not built**; uploads to
+  `avatars`/`chat-images` are **not scanned** server-side. Still a Play Store launch
+  blocker for a dating app.
+- ⚪ `generate-pdf-thumbnail` edge fn for `chat-files` doc previews (P3, no client UI).
+- ⚪ `wise-proofs` bucket (Wise receipt upload) — P3, Subscription "Upload Receipt"
+  button still shows a "coming soon" toast.
 
-Unblocks front-end: §1.4 & §7 (real photos), §4.2 (chat media/voice), §8 (Wise receipts).
+Unblocks front-end: §1.4 & §7 (real photos ✅), §4.2 (chat media/voice ✅).
 
 ---
 
 ## [BE-9] Discovery feed, match trigger & country counts — 🟠 PARTIAL
 
 - ✅ `likes`/`passes`/`matches` tables LIVE.
-- 🔴🔴 **The mutual-like → match trigger does NOT exist** (`check_for_match` /
-  `create_match_on_mutual_like`). Right now **nothing creates `matches` rows** — the
-  app can only show a match if one is inserted out-of-band. This is why Discover has no
-  "It's a Match!" feedback and the Likes realtime overlay can never fire. **Top matching
-  blocker.**
+- 🟢 **The mutual-like → match trigger is now LIVE** (`create_match_on_mutual_like`,
+  migration 014, `SECURITY DEFINER`, verified 2026-07-10). A mutual like now creates a
+  `matches` row automatically, so the Likes screen's realtime overlay fires for real.
+  (The client never showed its own popup in Discover by design — the Likes subscription
+  is the single source of the "It's a Match!" dialog.)
 - 🔴 **No discovery/candidate-feed RPC** — the client shows 5 mock profiles. Needs a
   server-side feed: exclude self/blocked/already-swiped, apply gender/age/distance
   preferences, geo-rank by `location_lat/lng` + `distance_preference_km`, paginate,
@@ -234,15 +243,14 @@ Unblocks front-end: §2.1 (like cap, view recording), §8 (usage bars), §4.2 (m
 
 ## [BE-11] Conversation state: last-message, archive, mute — 🟠 PARTIAL
 
-- ✅ `conversations` table LIVE, but:
-- 🔴🔴 **No INSERT policy + no auto-create trigger** on `conversations` — a new match
-  gets **no conversation**, so chat is unusable end-to-end for real matches until
-  backend adds a trigger that creates a `conversations` row when a `matches` row is
-  created (or a service-role/RPC path). **Top chat blocker** (documented in
-  migration_003.md §1/§9).
-- 🔴 **`conversations.last_message_id` / `last_message_at` are never populated** — needs
-  a trigger on `messages` insert to update them (client currently queries `messages`
-  directly to build previews).
+- ✅ `conversations` table LIVE.
+- 🟢 **Auto-create trigger is now LIVE** (`create_conversation_on_match`, migration 011,
+  `SECURITY DEFINER`, verified 2026-07-10) — every new match auto-gets a `conversations`
+  row, so chat works end-to-end for real matches. The client's old "Chat isn't available
+  for this match yet" wall is now a transient "Setting up your chat… / Retry" state.
+- 🔴 **`conversations.last_message_id` / `last_message_at` still not reliably populated**
+  — the client still queries `messages` directly to build previews (works, just not as
+  efficient as a trigger-maintained column would be).
 - 🔴 **`archived_conversations`** + **`muted_conversations`** tables (spec) — not
   delivered; client's delete/mute are local-only.
 

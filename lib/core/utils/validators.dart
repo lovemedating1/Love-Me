@@ -15,9 +15,12 @@ class Validators {
     return null;
   }
 
+  /// Minimum 6 characters, matching the old app ("Min 6 characters").
   static String? password(String? v) {
     if (v == null || v.isEmpty) return 'Password is required';
-    if (v.length < 8) return 'Password must be at least 8 characters';
+    if (v.length < AppConstants.minPasswordChars) {
+      return 'Password must be at least ${AppConstants.minPasswordChars} characters';
+    }
     return null;
   }
 

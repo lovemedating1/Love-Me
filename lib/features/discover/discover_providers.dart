@@ -2,6 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/data/repositories.dart';
 import '../../shared/models/profile.dart';
+import '../../shared/models/profile_photo.dart';
+
+/// Radius presets shown as chips in the search-radius sheet (km).
+const List<int> kRadiusPresetsKm = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 
 /// Discover feed filters.
 class DiscoverFilters {
@@ -61,9 +65,29 @@ class DiscoverFiltersController extends Notifier<DiscoverFilters> {
   void reset() => state = const DiscoverFilters();
 }
 
-/// The filtered feed of profiles (mock, async).
+/// The filtered feed of profiles — real `profiles` rows from the database
+/// (see `SupabaseProfileRepository.discoverFeed`), with the local
+/// [DiscoverFilters] applied on top.
 final discoverFeedProvider = FutureProvider<List<Profile>>((ref) async {
   final all = await ref.watch(profileRepositoryProvider).discoverFeed();
   final filters = ref.watch(discoverFiltersProvider);
   return all.where(filters.matches).toList();
+});
+
+/// Worldwide search toggle — when on, the radius slider/filters are ignored.
+final worldwideSearchProvider = StateProvider<bool>((ref) => true);
+
+/// Selected search radius in km (used only when worldwide is off).
+final searchRadiusKmProvider = StateProvider<int>((ref) => 50);
+
+/// Gallery photos for a Discover card, keyed by user id. Falls back to just
+/// the single `photoUrl` when the user has no `profile_photos` rows (e.g.
+/// mock candidates, or real users who haven't uploaded a gallery yet).
+final cardPhotosProvider =
+    FutureProvider.family<List<ProfilePhoto>, String>((ref, userId) async {
+  try {
+    return await ref.read(profilePhotoRepositoryProvider).photosFor(userId);
+  } catch (_) {
+    return const [];
+  }
 });

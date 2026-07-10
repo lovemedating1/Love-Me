@@ -143,32 +143,45 @@ class MockData {
     (flag: '🇬🇧', name: 'United Kingdom', count: 2050),
   ];
 
-  /// Premium plans (placeholder duration tiers — see SubscriptionPlan doc note).
+  /// Real 5 plan tiers, locked against the old app screenshots
+  /// (UI_REBUILD_PLAN.md §0.2). Free tier's profile limit is unconfirmed.
   static const List<SubscriptionPlan> plans = [
     SubscriptionPlan(
-        id: 'monthly', name: 'Monthly', priceUsd: 9.99, period: 'month'),
+        id: 'basic_plus',
+        name: 'Basic+',
+        priceUsd: 5,
+        period: 'month',
+        badge: 'Silver',
+        profileLimit: 500),
     SubscriptionPlan(
-        id: 'quarterly',
-        name: 'Quarterly',
-        priceUsd: 24.99,
-        period: '3 months',
-        popular: true,
-        savingsLabel: 'Save 17%'),
+        id: 'gold',
+        name: 'Gold',
+        priceUsd: 10,
+        period: 'month',
+        badge: 'Gold',
+        profileLimit: 1000,
+        popular: true),
     SubscriptionPlan(
-        id: 'yearly',
-        name: 'Yearly',
-        priceUsd: 79.99,
-        period: 'year',
-        savingsLabel: 'Save 33%'),
-  ];
-
-  static const List<String> premiumPerks = [
-    'Unlimited likes',
-    'See who liked you',
-    'Read receipts',
-    'Voice & video calls',
-    'Advanced filters',
-    'No ads',
+        id: 'platinum',
+        name: 'Platinum',
+        priceUsd: 15,
+        period: 'month',
+        badge: 'Diamond',
+        profileLimit: 1500),
+    SubscriptionPlan(
+        id: 'premium_elite',
+        name: 'Premium Elite',
+        priceUsd: 20,
+        period: 'month',
+        badge: 'Crown',
+        profileLimit: 2000),
+    SubscriptionPlan(
+        id: 'vip_elite',
+        name: 'VIP Elite',
+        priceUsd: 25,
+        period: 'month',
+        badge: 'VIP',
+        profileLimit: null),
   ];
 
   /// Safety reports the user has submitted.

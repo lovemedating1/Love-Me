@@ -54,17 +54,16 @@ abstract interface class ProfileRepository {
   Future<ProfileStats> myStats();
 
   /// Patches editable fields on the current user's `profiles` row.
-  Future<void> updateMyProfile({String? name});
+  Future<void> updateMyProfile({String? name, int? distancePreferenceKm});
 }
 
 // ---- Mock implementations --------------------------------------------------
 
-/// Live-backed for `me()`/`byId()` (the `profiles` table) and for
+/// Live-backed for `me()`/`byId()` (the `profiles` table), `discoverFeed()`
+/// (real `profiles` rows, excluding self + already-swiped users), and
 /// `likedYou()`/`matches()` (joined against the live `likes`/`matches`
-/// tables). `discoverFeed()` is still the mock candidate deck — real
-/// discovery/ranking isn't built server-side yet — but it excludes profiles
-/// already swiped via the live `likes`/`passes` tables. `byCountry()` stays
-/// mock (Explore's candidate list isn't backed by a table yet either).
+/// tables). Only `byCountry()` stays on mock data — Explore's country RPC
+/// (`get_country_counts`) isn't built server-side yet ([BE-9]).
 class SupabaseProfileRepository implements ProfileRepository {
   const SupabaseProfileRepository({
     this.swipeRepository = const SupabaseSwipeRepository(),
@@ -97,10 +96,31 @@ class SupabaseProfileRepository implements ProfileRepository {
     return row == null ? null : Profile.fromJson(row);
   }
 
+  /// The Discover candidate deck — real `profiles` rows from the database,
+  /// excluding myself and anyone I've already liked/passed.
+  ///
+  /// There's no server-side discovery/ranking RPC yet ([BE-9]): no geo
+  /// ranking, no per-plan daily cap, no distance. This is a plain query
+  /// (newest complete profiles first, capped) with client-side exclusion of
+  /// already-swiped users. Age/gender/etc. filtering still happens in
+  /// `discoverFiltersProvider` on top of this list.
   @override
   Future<List<Profile>> discoverFeed() async {
+    final myId = _client.auth.currentUser!.id;
     final swiped = await swipeRepository.getSwipedUserIds();
-    return MockData.profiles.where((p) => !swiped.contains(p.userId)).toList();
+
+    final rows = await _client
+        .from('profiles')
+        .select()
+        .neq('user_id', myId)
+        .eq('profile_complete', true)
+        .order('created_at', ascending: false)
+        .limit(100);
+
+    return (rows as List)
+        .map((p) => Profile.fromJson(p as Map<String, dynamic>))
+        .where((p) => !swiped.contains(p.userId))
+        .toList();
   }
 
   /// Everyone who liked the current user (`likes.to_user_id = me`), resolved
@@ -166,13 +186,14 @@ class SupabaseProfileRepository implements ProfileRepository {
   }
 
   @override
-  Future<void> updateMyProfile({String? name}) async {
-    if (name == null) return;
+  Future<void> updateMyProfile({String? name, int? distancePreferenceKm}) async {
+    if (name == null && distancePreferenceKm == null) return;
     final myId = _client.auth.currentUser!.id;
-    await _client
-        .from('profiles')
-        .update({'name': name})
-        .eq('user_id', myId);
+    await _client.from('profiles').update({
+      if (name != null) 'name': name,
+      if (distancePreferenceKm != null)
+        'distance_preference_km': distancePreferenceKm,
+    }).eq('user_id', myId);
   }
 }
 
@@ -214,7 +235,7 @@ class MockProfileRepository implements ProfileRepository {
       matches: MockData.matchesCount));
 
   @override
-  Future<void> updateMyProfile({String? name}) async {}
+  Future<void> updateMyProfile({String? name, int? distancePreferenceKm}) async {}
 }
 
 // ---- Providers -------------------------------------------------------------
@@ -249,9 +270,6 @@ final currentUserProvider =
 
 /// Whether the current user has premium (mock — drives feature gates/blur).
 final isPremiumProvider = StateProvider<bool>((ref) => false);
-
-/// Whether the current user has the admin role (mock — gates Admin Diagnostics).
-final isAdminProvider = StateProvider<bool>((ref) => false);
 
 // ---- Async list providers for Phase 3 screens ------------------------------
 final likedYouProvider =

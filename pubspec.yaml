@@ -8,8 +8,9 @@ environment:
 
 # ---------------------------------------------------------------------------
 # Front end (Phases 1-4) + backend-integration track (Auth & Profile layer).
-# Firebase, flutter_webrtc, geolocator, payment SDKs, in_app_purchase remain
-# DEFERRED until the tables/features they back are live.
+# Firebase, flutter_webrtc, payment SDKs, in_app_purchase remain DEFERRED
+# until the tables/features they back are live. geolocator added 2026-07-10
+# for real onboarding GPS capture.
 # ---------------------------------------------------------------------------
 dependencies:
   flutter:
@@ -28,6 +29,7 @@ dependencies:
   record: ^7.1.1            # voice message recording (5.x ships a broken record_linux)
   video_thumbnail: ^0.5.3   # thumbnail for chat video messages (DB-required)
   path_provider: ^2.1.4     # temp paths for recording/thumbnail files
+  geolocator: ^13.0.2       # real GPS capture for onboarding "use my location"
 
   # State & DI
   flutter_riverpod: ^2.6.1

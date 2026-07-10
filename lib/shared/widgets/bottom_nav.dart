@@ -9,11 +9,18 @@ class NavDestination {
     required this.icon,
     required this.label,
     required this.route,
+    this.activeIcon,
     this.badgeCount = 0,
     this.showDot = false,
   });
 
+  /// Outline icon, shown when the tab is not selected.
   final IconData icon;
+
+  /// Solid icon, shown when the tab **is** selected (old app fills the active
+  /// tab's glyph). Falls back to [icon] when null.
+  final IconData? activeIcon;
+
   final String label;
   final String route;
   final int badgeCount;
@@ -31,16 +38,40 @@ class BottomNav extends StatelessWidget {
   final String currentRoute;
   final void Function(String route) onTap;
 
+  /// Matches the old app: sparkles for Discover, and a solid glyph on the
+  /// active tab. Lucide ships outline-only, so the filled states use Material
+  /// icons — visually equivalent to the screenshots.
   static const List<NavDestination> destinations = [
     NavDestination(
-        icon: LucideIcons.compass, label: 'Discover', route: RoutePaths.discover),
-    NavDestination(icon: LucideIcons.heart, label: 'Likes', route: RoutePaths.likes),
+      icon: LucideIcons.sparkles,
+      activeIcon: Icons.auto_awesome,
+      label: 'Discover',
+      route: RoutePaths.discover,
+    ),
     NavDestination(
-        icon: LucideIcons.messageCircle,
-        label: 'Messages',
-        route: RoutePaths.messages),
-    NavDestination(icon: LucideIcons.globe, label: 'Explore', route: RoutePaths.explore),
-    NavDestination(icon: LucideIcons.user, label: 'Profile', route: RoutePaths.profile),
+      icon: LucideIcons.heart,
+      activeIcon: Icons.favorite,
+      label: 'Likes',
+      route: RoutePaths.likes,
+    ),
+    NavDestination(
+      icon: LucideIcons.messageCircle,
+      activeIcon: Icons.chat_bubble,
+      label: 'Messages',
+      route: RoutePaths.messages,
+    ),
+    NavDestination(
+      icon: LucideIcons.globe,
+      activeIcon: Icons.public,
+      label: 'Explore',
+      route: RoutePaths.explore,
+    ),
+    NavDestination(
+      icon: LucideIcons.user,
+      activeIcon: Icons.person,
+      label: 'Profile',
+      route: RoutePaths.profile,
+    ),
   ];
 
   @override
@@ -55,7 +86,7 @@ class BottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 64,
+          height: 72,
           child: Row(
             children: [
               for (final d in destinations)
@@ -89,6 +120,9 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final color = selected ? scheme.primary : scheme.onSurface.withValues(alpha: 0.55);
+    final icon = selected
+        ? (destination.activeIcon ?? destination.icon)
+        : destination.icon;
     return InkWell(
       onTap: onTap,
       child: Column(
@@ -97,7 +131,7 @@ class _NavItem extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Icon(destination.icon, color: color, size: 24),
+              Icon(icon, color: color, size: 24),
               if (destination.badgeCount > 0)
                 Positioned(
                   right: -8,
@@ -138,6 +172,16 @@ class _NavItem extends StatelessWidget {
                 color: color,
                 fontSize: 11,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+          ),
+          const SizedBox(height: 3),
+          // The small pink dot under the active tab (old app).
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: selected ? scheme.primary : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
           ),
         ],
       ),

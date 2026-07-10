@@ -22,10 +22,14 @@ class Profile extends Equatable {
     this.hobbies = const [],
     this.distanceKm,
     this.distancePreferenceKm = 50,
+    this.locationLat,
+    this.locationLng,
+    this.locationAccuracyM,
     this.photoUrl,
     this.isVerified = false,
     this.profileComplete = false,
     this.isPremium = false,
+    this.premiumUntil,
     this.ringtone = '',
     // Local-only (no backing column/table yet):
     this.gallery = const [],
@@ -47,11 +51,33 @@ class Profile extends Equatable {
   final List<String> hobbies;
   final double? distanceKm;
   final int distancePreferenceKm;
+
+  /// Real GPS fix from onboarding's "Use current location" (`geolocator`).
+  /// Null until the user grants location permission and captures one.
+  final double? locationLat;
+  final double? locationLng;
+  final double? locationAccuracyM;
+
   final String? photoUrl;
   final bool isVerified;
   final bool profileComplete;
   final bool isPremium;
+
+  /// When the current subscription lapses. Read-only from the client (set by
+  /// the payment backend). `null` when the user has no active plan — the
+  /// header's renewal countdown pill is **hidden** in that case rather than
+  /// showing a fabricated number.
+  final DateTime? premiumUntil;
+
   final String ringtone;
+
+  /// Whole days until [premiumUntil], or `null` when unknown/expired.
+  int? get premiumDaysLeft {
+    final until = premiumUntil;
+    if (until == null) return null;
+    final days = until.difference(DateTime.now()).inDays;
+    return days < 0 ? null : days;
+  }
 
   // Local-only fields (see class doc).
   final List<String> gallery;
@@ -90,10 +116,16 @@ class Profile extends Equatable {
       relationshipGoal: json['relationship_goal'] as String?,
       hobbies: (json['hobbies'] as List<dynamic>?)?.cast<String>() ?? const [],
       distancePreferenceKm: json['distance_preference_km'] as int? ?? 50,
+      locationLat: (json['location_lat'] as num?)?.toDouble(),
+      locationLng: (json['location_lng'] as num?)?.toDouble(),
+      locationAccuracyM: (json['location_accuracy_m'] as num?)?.toDouble(),
       photoUrl: json['photo_url'] as String?,
       isVerified: json['is_verified'] as bool? ?? false,
       profileComplete: json['profile_complete'] as bool? ?? false,
       isPremium: json['is_premium'] as bool? ?? false,
+      premiumUntil: json['premium_until'] == null
+          ? null
+          : DateTime.parse(json['premium_until'] as String),
       ringtone: json['ringtone'] as String? ?? '',
     );
   }
@@ -115,6 +147,9 @@ class Profile extends Equatable {
         if (relationshipGoal != null) 'relationship_goal': relationshipGoal,
         'hobbies': hobbies,
         'distance_preference_km': distancePreferenceKm,
+        if (locationLat != null) 'location_lat': locationLat,
+        if (locationLng != null) 'location_lng': locationLng,
+        if (locationAccuracyM != null) 'location_accuracy_m': locationAccuracyM,
         if (photoUrl != null) 'photo_url': photoUrl,
         'ringtone': ringtone,
         'profile_complete': profileComplete,
@@ -133,10 +168,14 @@ class Profile extends Equatable {
     List<String>? hobbies,
     double? distanceKm,
     int? distancePreferenceKm,
+    double? locationLat,
+    double? locationLng,
+    double? locationAccuracyM,
     String? photoUrl,
     bool? isVerified,
     bool? profileComplete,
     bool? isPremium,
+    DateTime? premiumUntil,
     String? ringtone,
     List<String>? gallery,
     String? bio,
@@ -157,10 +196,14 @@ class Profile extends Equatable {
       hobbies: hobbies ?? this.hobbies,
       distanceKm: distanceKm ?? this.distanceKm,
       distancePreferenceKm: distancePreferenceKm ?? this.distancePreferenceKm,
+      locationLat: locationLat ?? this.locationLat,
+      locationLng: locationLng ?? this.locationLng,
+      locationAccuracyM: locationAccuracyM ?? this.locationAccuracyM,
       photoUrl: photoUrl ?? this.photoUrl,
       isVerified: isVerified ?? this.isVerified,
       profileComplete: profileComplete ?? this.profileComplete,
       isPremium: isPremium ?? this.isPremium,
+      premiumUntil: premiumUntil ?? this.premiumUntil,
       ringtone: ringtone ?? this.ringtone,
       gallery: gallery ?? this.gallery,
       bio: bio ?? this.bio,

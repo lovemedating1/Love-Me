@@ -2,9 +2,15 @@
 
 **To:** Backend team
 **From:** Flutter (client) team
-**Date:** 2026-07-09
+**Date:** 2026-07-09 · **Updated 2026-07-10 after backend deploy**
 **Project ref:** `tamlbnmihdcjiptbezjm`
-**Status:** 🔴 **BLOCKING** — the client-side media feature is fully built and shipped in code, but **cannot function at all** because no Storage buckets exist.
+**Status:** 🟢 **MOSTLY RESOLVED** — backend deployed migrations 009-019 (buckets,
+storage RLS, match/conversation triggers) and verified them live on 2026-07-10. Photo/
+gallery/chat-media/voice uploads and the match→conversation flow now work end-to-end.
+The client reconciled to this the same day (see `developer.log` "MEDIA / MATCHING
+BACKEND WENT LIVE"). **The one remaining blocker is `moderate-image`** (§6, [BE-5]) —
+the server-side NSFW/human gate is still not built, which is a Play Store policy
+requirement. Original blocking text below kept for history.
 
 ---
 
@@ -393,15 +399,26 @@ Please tick these off; we'll re-test on-device once they're green.
 
 ---
 
-## 11. Open questions we need answered
+## 11. Open questions — resolution status (updated 2026-07-10)
 
-1. **Signed-URL expiry (§2):** store object paths instead of 7-day signed URLs? *(We recommend yes.)*
-2. **Moderation trigger point (§6):** client-invoked (Option A) or storage-webhook (Option B)? *(We recommend B.)*
-3. **Primary-photo deletion (§5.1):** will you add auto-promotion, or should the client handle it?
-4. **Max photo count:** DB enforces **4**. Our `AppConstants` says 6 (unused). **Confirm 4 is final.**
-5. **`chat-files` bucket** currently holds videos. Your spec describes it as PDFs/docs, with videos unspecified. **Confirm videos belong in `chat-files`,** or give us a dedicated `chat-videos` bucket name.
-6. **Voice message max length:** client caps recording implicitly; spec says ≤60s. Any server-side limit?
-7. **`location` message type (§5.2):** add lat/lng columns, or drop the enum value?
+1. **Signed-URL expiry (§2):** ✅ **RESOLVED — option (a).** Client now stores the
+   object **path** in `messages.media_url`/`thumbnail_url` and mints a fresh 1-hour
+   signed URL at render time (`ChatRepository.signedUrlFor`). Chat media no longer
+   expires. Done client-side 2026-07-10.
+2. **Moderation trigger point (§6):** ⏳ still open — `moderate-image` not built yet.
+   Backend recommended Option B (storage webhook, no client change). Awaiting the fn.
+3. **Primary-photo deletion (§5.1):** ✅ **RESOLVED by backend** — migration 017
+   (`auto_promote_primary_photo`) auto-promotes another photo when the primary is
+   deleted. No client handling needed.
+4. **Max photo count:** ✅ **CONFIRMED 4.** The unused `AppConstants.maxGalleryPhotos`
+   (=6) was deleted in the UI-parity cleanup pass; the real cap of 4 lives in
+   `profile_screen.dart`'s local `_maxProfilePhotos`.
+5. **`chat-files` bucket holds videos:** ✅ **CONFIRMED** — backend created `chat-files`
+   as the private 50MB `video/mp4` bucket; the client's `kChatVideosBucket` points at it.
+6. **Voice message max length:** ⏳ still open — no explicit server-side limit confirmed;
+   client caps recording implicitly. Low priority.
+7. **`location` message type (§5.2):** ⏳ still open — client doesn't send it; no urgency
+   (backend memo §5 also flags it as unresolved-but-unused).
 
 ---
 

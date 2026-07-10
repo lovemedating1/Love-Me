@@ -1,17 +1,27 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/constants/route_paths.dart';
+import '../../core/settings/local_settings_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_gradients.dart';
 import '../../core/utils/validators.dart';
+import '../../shared/widgets/gradient_button.dart';
 import 'auth_controller.dart';
 import 'reset_password_dialog.dart';
 
-/// 01 — AuthPage. Sign In / Sign Up tabs + Google OAuth + reset flow + 18+ gate.
+/// 01 — AuthPage. Rebuilt for UI parity with the old app
+/// (`old app ss/IMG-…-WA0042.jpg` Login, `…WA0047.jpg` Sign Up).
+///
+/// Deliberate differences from our old build, per UI_REBUILD_PLAN.md §0.4:
+/// no surrounding Card, no confirm-password, no DOB/gender/country at sign-up
+/// (they move to onboarding), no Google button, no legal footer. Password
+/// minimum is **6** characters.
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
@@ -23,39 +33,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final _confirm = TextEditingController();
 
   bool _isSignUp = false;
   bool _obscure = true;
-  bool _rememberMe = false;
   bool _acceptTerms = false;
-  String? _gender; // 'male' | 'female'
-  String? _country;
-  DateTime? _dob;
+  bool _prefilledEmail = false;
 
-  static const _countries = [
-    'Kenya', 'Nigeria', 'Ghana', 'South Africa', 'Egypt', 'Uganda',
-    'Tanzania', 'India', 'United States', 'United Kingdom',
-  ];
+  // Held as fields (not created in build) so they can be disposed.
+  late final _termsTap = TapGestureRecognizer()
+    ..onTap = () => context.push(RoutePaths.terms);
+  late final _privacyTap = TapGestureRecognizer()
+    ..onTap = () => context.push(RoutePaths.privacy);
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
-    _confirm.dispose();
+    _termsTap.dispose();
+    _privacyTap.dispose();
     super.dispose();
   }
 
-  Future<void> _pickDob() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(now.year - 20, now.month, now.day),
-      firstDate: DateTime(now.year - 100),
-      lastDate: now,
-      helpText: 'Date of birth',
-    );
-    if (picked != null) setState(() => _dob = picked);
+  /// "Remember me" is backed by [LocalSettings] (Settings screen's
+  /// "Remember email after inactivity logout" toggle) rather than a
+  /// separate local field — one real preference, not a decorative
+  /// checkbox plus an unrelated setting.
+  void _prefillRememberedEmail(LocalSettings settings) {
+    if (_prefilledEmail) return;
+    _prefilledEmail = true;
+    if (settings.rememberEmail && settings.rememberedEmail != null) {
+      _email.text = settings.rememberedEmail!;
+    }
   }
 
   void _toast(String msg, {bool error = false}) {
@@ -71,23 +79,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_isSignUp) {
-      final dobError = Validators.dob(_dob);
-      if (dobError != null) { _toast(dobError, error: true); return; }
-      if (_gender == null) { _toast('Select your gender', error: true); return; }
-      if (_country == null) { _toast('Select your country', error: true); return; }
-      if (!_acceptTerms) {
-        _toast('You must accept the terms and confirm you are 18+', error: true);
-        return;
-      }
+    if (_isSignUp && !_acceptTerms) {
+      _toast('You must confirm you are 18+ and accept the terms', error: true);
+      return;
     }
 
     final auth = ref.read(authControllerProvider.notifier);
+    final email = _email.text.trim();
     try {
       if (_isSignUp) {
-        await auth.signUp(_email.text.trim(), _password.text);
+        await auth.signUp(email, _password.text);
       } else {
-        await auth.signIn(_email.text.trim(), _password.text);
+        await auth.signIn(email, _password.text);
+        await ref
+            .read(localSettingsProvider.notifier)
+            .rememberEmailIfEnabled(email);
       }
       if (mounted) _toast(_isSignUp ? 'Account created!' : 'Welcome back!');
       // Router redirect (guard) takes the user onward automatically.
@@ -96,116 +102,98 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  /// Old app has a "↻ Refresh" action under the CTA — it re-runs the session
+  /// check (useful after confirming an email in another app).
+  void _refresh() {
+    ref.invalidate(authControllerProvider);
+    _toast('Refreshed');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loading = ref.watch(authControllerProvider).loading;
+    final localSettings = ref.watch(localSettingsProvider);
+    _prefillRememberedEmail(localSettings);
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppGradients.header),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 448),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _logo(theme),
-                          const SizedBox(height: 20),
-                          _tabs(theme),
-                          const SizedBox(height: 20),
-                          TextFormField(
-                            controller: _email,
-                            keyboardType: TextInputType.emailAddress,
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                            validator: Validators.email,
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: Icon(LucideIcons.mail),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _password,
-                            obscureText: _obscure,
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                            validator: Validators.password,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(LucideIcons.lock),
-                              suffixIcon: IconButton(
-                                icon: Icon(_obscure
-                                    ? LucideIcons.eye
-                                    : LucideIcons.eyeOff),
-                                onPressed: () =>
-                                    setState(() => _obscure = !_obscure),
-                              ),
-                            ),
-                          ),
-                          if (_isSignUp) ...[
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _confirm,
-                              obscureText: _obscure,
-                              autovalidateMode:
-                                  AutovalidateMode.onUserInteraction,
-                              validator: (v) => Validators.confirmPassword(
-                                  v, _password.text),
-                              decoration: const InputDecoration(
-                                labelText: 'Confirm password',
-                                prefixIcon: Icon(LucideIcons.lock),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            _dobField(theme),
-                            const SizedBox(height: 12),
-                            _genderField(),
-                            const SizedBox(height: 12),
-                            _countryField(),
-                            const SizedBox(height: 8),
-                            _termsCheckbox(theme),
-                          ],
-                          if (!_isSignUp) _signInRow(theme),
-                          const SizedBox(height: 20),
-                          FilledButton(
-                            onPressed: loading ? null : _submit,
-                            child: loading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white))
-                                : Text(
-                                    _isSignUp ? 'Create Account' : 'Sign In'),
-                          ),
-                          const SizedBox(height: 12),
-                          _divider(theme),
-                          const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            onPressed: loading
-                                ? null
-                                : () => ref
-                                    .read(authControllerProvider.notifier)
-                                    .signInWithGoogle(),
-                            icon: const Icon(LucideIcons.logIn),
-                            label: const Text('Continue with Google'),
-                          ),
-                          const SizedBox(height: 16),
-                          _legalFooter(theme),
-                        ],
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints:
+                  const BoxConstraints(maxWidth: AppConstants.maxContainerWidth),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _logo(theme),
+                    const SizedBox(height: 28),
+                    _tabs(theme),
+                    const SizedBox(height: 28),
+                    _label(theme, 'Email'),
+                    TextFormField(
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: Validators.email,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LucideIcons.mail),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 18),
+                    _label(theme, 'Password'),
+                    TextFormField(
+                      controller: _password,
+                      obscureText: _obscure,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: Validators.password,
+                      decoration: InputDecoration(
+                        hintText: 'Min ${AppConstants.minPasswordChars} characters',
+                        prefixIcon: const Icon(LucideIcons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                              _obscure ? LucideIcons.eye : LucideIcons.eyeOff),
+                          onPressed: () => setState(() => _obscure = !_obscure),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_isSignUp)
+                      _termsCheckbox(theme)
+                    else
+                      _rememberMeRow(localSettings.rememberEmail),
+                    const SizedBox(height: 20),
+                    GradientButton(
+                      label: _isSignUp ? 'Sign Up' : 'Login',
+                      loading: loading,
+                      onPressed: loading ? null : _submit,
+                    ),
+                    if (!_isSignUp)
+                      TextButton(
+                        onPressed: () => showDialog(
+                          context: context,
+                          builder: (_) =>
+                              ResetPasswordDialog(initialEmail: _email.text),
+                        ),
+                        child: const Text(
+                          'Forgot password?',
+                          style: TextStyle(
+                              color: AppColors.pink,
+                              fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    TextButton.icon(
+                      onPressed: _refresh,
+                      icon: const Icon(LucideIcons.refreshCw,
+                          size: 16, color: AppColors.mutedFg),
+                      label: const Text('Refresh',
+                          style: TextStyle(color: AppColors.mutedFg)),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -214,171 +202,141 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       ),
     );
   }
+
+  Widget _label(ThemeData theme, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8, left: 2),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      );
 
   Widget _logo(ThemeData theme) => Column(
         children: [
           Container(
-            width: 72,
-            height: 72,
-            decoration: const BoxDecoration(
-                gradient: AppGradients.premium, shape: BoxShape.circle),
-            child: const Icon(LucideIcons.heart, color: Colors.white, size: 36),
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(
+              gradient: AppGradients.cta,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.pink.withValues(alpha: 0.35),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(LucideIcons.heart, color: Colors.white, size: 40),
           ),
-          const SizedBox(height: 12),
-          Text('Love Me', style: theme.textTheme.headlineMedium),
-          Text('Find your someone',
-              style: theme.textTheme.bodySmall),
+          const SizedBox(height: 14),
+          Text('LoveMe',
+              style: theme.textTheme.headlineMedium
+                  ?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text('Find your perfect match',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: AppColors.mutedFg)),
         ],
       );
 
-  Widget _tabs(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Row(
-        children: [
-          _tab('Sign In', !_isSignUp, () => setState(() => _isSignUp = false)),
-          _tab('Sign Up', _isSignUp, () => setState(() => _isSignUp = true)),
-        ],
-      ),
-    );
-  }
+  /// Full-bleed segmented control — squarer than our old rounded pills.
+  Widget _tabs(ThemeData theme) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: theme.colorScheme.outline),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          children: [
+            _tab('Login', !_isSignUp, () => setState(() => _isSignUp = false)),
+            _tab('Sign Up', _isSignUp, () => setState(() => _isSignUp = true)),
+          ],
+        ),
+      );
 
   Widget _tab(String label, bool selected, VoidCallback onTap) => Expanded(
         child: GestureDetector(
           onTap: onTap,
+          behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.pink : Colors.transparent,
-              borderRadius: BorderRadius.circular(999),
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            color: selected ? AppColors.pink : Colors.transparent,
             alignment: Alignment.center,
             child: Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.white : null,
+                color: selected ? Colors.white : AppColors.mutedFg,
                 fontWeight: FontWeight.w700,
+                fontSize: 16,
               ),
             ),
           ),
         ),
       );
 
-  Widget _dobField(ThemeData theme) => InkWell(
-        onTap: _pickDob,
-        child: InputDecorator(
-          decoration: const InputDecoration(
-            labelText: 'Date of birth (18+)',
-            prefixIcon: Icon(LucideIcons.calendar),
+  Widget _rememberMeRow(bool rememberMe) => Row(
+        children: [
+          Checkbox(
+            value: rememberMe,
+            shape: const CircleBorder(),
+            activeColor: AppColors.pink,
+            onChanged: (v) => ref
+                .read(localSettingsProvider.notifier)
+                .setRememberEmail(v ?? false),
           ),
-          child: Text(
-            _dob == null
-                ? 'Select date'
-                : '${_dob!.year}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}',
-          ),
-        ),
-      );
-
-  Widget _genderField() => DropdownButtonFormField<String>(
-        initialValue: _gender,
-        decoration: const InputDecoration(
-            labelText: 'Gender', prefixIcon: Icon(LucideIcons.users)),
-        items: const [
-          DropdownMenuItem(value: 'male', child: Text('Male')),
-          DropdownMenuItem(value: 'female', child: Text('Female')),
+          const Text('Remember me'),
         ],
-        onChanged: (v) => setState(() => _gender = v),
-      );
-
-  Widget _countryField() => DropdownButtonFormField<String>(
-        initialValue: _country,
-        isExpanded: true,
-        decoration: const InputDecoration(
-            labelText: 'Country', prefixIcon: Icon(LucideIcons.mapPin)),
-        items: [
-          for (final c in _countries)
-            DropdownMenuItem(value: c, child: Text(c)),
-        ],
-        onChanged: (v) => setState(() => _country = v),
       );
 
   Widget _termsCheckbox(ThemeData theme) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Checkbox(
             value: _acceptTerms,
+            shape: const CircleBorder(),
+            activeColor: AppColors.pink,
             onChanged: (v) => setState(() => _acceptTerms = v ?? false),
           ),
           Expanded(
-            child: Text(
-              'I am 18+ and accept the Terms & Privacy Policy',
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-        ],
-      );
-
-  Widget _signInRow(ThemeData theme) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Checkbox(
-                  value: _rememberMe,
-                  visualDensity: VisualDensity.compact,
-                  onChanged: (v) => setState(() => _rememberMe = v ?? false),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text.rich(
+                TextSpan(
+                  style: theme.textTheme.bodySmall,
+                  children: [
+                    const TextSpan(text: 'I confirm I am at least '),
+                    const TextSpan(
+                        text: '18 years old',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    const TextSpan(
+                        text: ', I am using this app voluntarily, and I agree '
+                            'to the '),
+                    _linkSpan('Terms & Conditions', _termsTap),
+                    const TextSpan(text: ' and '),
+                    _linkSpan('Privacy Policy', _privacyTap),
+                    const TextSpan(text: '.'),
+                  ],
                 ),
-                const Flexible(
-                    child: Text('Remember me', overflow: TextOverflow.ellipsis)),
-              ],
+              ),
             ),
           ),
-          TextButton(
-            onPressed: () => showDialog(
-              context: context,
-              builder: (_) => ResetPasswordDialog(initialEmail: _email.text),
-            ),
-            child: const Text('Forgot password?'),
-          ),
         ],
       );
 
-  Widget _divider(ThemeData theme) => Row(
-        children: [
-          const Expanded(child: Divider()),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text('or', style: theme.textTheme.bodySmall),
-          ),
-          const Expanded(child: Divider()),
-        ],
-      );
-
-  Widget _legalFooter(ThemeData theme) => Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 12,
-        children: [
-          _legalLink('Terms', RoutePaths.terms),
-          _legalLink('Privacy', RoutePaths.privacy),
-          _legalLink('Refund', RoutePaths.refund),
-          _legalLink('Child Safety', RoutePaths.childSafety),
-        ],
-      );
-
-  Widget _legalLink(String label, String route) => GestureDetector(
-        onTap: () => context.push(route),
-        child: Text(
-          label,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(decoration: TextDecoration.underline),
+  TextSpan _linkSpan(String text, TapGestureRecognizer recognizer) => TextSpan(
+        text: text,
+        style: const TextStyle(
+          color: AppColors.pink,
+          fontWeight: FontWeight.w700,
+          decoration: TextDecoration.underline,
         ),
+        recognizer: recognizer,
       );
 }

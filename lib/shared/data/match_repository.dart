@@ -4,15 +4,17 @@ import '../models/match.dart';
 
 /// Matches — live against `matches` (migration 003_matching.sql).
 ///
-/// RLS grants SELECT/UPDATE only: matches are system-created by a mutual-like
-/// trigger that hasn't shipped yet, so there is no `create`/insert here.
+/// RLS grants SELECT/UPDATE only: matches are system-created by the live
+/// `create_match_on_mutual_like` trigger (migration 014, `SECURITY DEFINER`),
+/// so there is no `create`/insert here. A new row appears the instant two
+/// users like each other — [subscribeToNewMatches] fires on that insert.
 abstract interface class MatchRepository {
   Future<List<Match>> myMatches();
   Future<void> unmatch(String matchId);
   Future<void> block(String matchId);
 
   /// Fires when a new `matches` row involving the current user is inserted
-  /// (i.e. once the mutual-like trigger exists and creates one).
+  /// by the live mutual-like trigger.
   sb.RealtimeChannel subscribeToNewMatches(void Function(Match) onNewMatch);
 }
 

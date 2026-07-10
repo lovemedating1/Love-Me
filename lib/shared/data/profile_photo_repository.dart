@@ -21,6 +21,11 @@ const kAvatarsBucket = 'avatars';
 abstract interface class ProfilePhotoRepository {
   Future<List<ProfilePhoto>> myPhotos();
 
+  /// Gallery for an arbitrary user (e.g. a Discover card) — public read
+  /// under the table's RLS (profile photos are visible to any signed-in
+  /// user). Ordered by `display_order`.
+  Future<List<ProfilePhoto>> photosFor(String userId);
+
   /// Uploads raw image bytes to the `avatars` bucket at
   /// `<user_id>/<uuid>.<ext>` and returns the public URL to store in a
   /// `profile_photos` row. Does NOT insert the row — call [addPhoto] with the
@@ -158,6 +163,18 @@ class SupabaseProfilePhotoRepository implements ProfilePhotoRepository {
       if (e.code == '23514') throw ProfilePhotoConstraintException(e.message);
       rethrow;
     }
+  }
+
+  @override
+  Future<List<ProfilePhoto>> photosFor(String userId) async {
+    final rows = await _client
+        .from('profile_photos')
+        .select()
+        .eq('user_id', userId)
+        .order('display_order');
+    return (rows as List)
+        .map((p) => ProfilePhoto.fromJson(p as Map<String, dynamic>))
+        .toList();
   }
 
   @override

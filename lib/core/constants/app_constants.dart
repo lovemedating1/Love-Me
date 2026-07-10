@@ -14,12 +14,20 @@ class AppConstants {
   static const int freeTrialDays = 3;
 
   // Content limits.
+  /// Old app shows "Min 6 characters" on both Login and Sign Up.
+  static const int minPasswordChars = 6;
+
   static const int maxBioChars = 500;
   static const int maxInterests = 8;
-  static const int maxGalleryPhotos = 6;
   static const int messageMaxChars = 2000;
   static const int minAge = 18;
   static const int nearbyMaxKm = 500;
+
+  /// Sentinel value stored in `profiles.distance_preference_km` to mean
+  /// "worldwide" — larger than any real preset (Discover's radius sheet
+  /// tops out at 5000km) and larger than any possible real-world distance,
+  /// so it's unambiguous. Avoids adding a separate boolean column.
+  static const int kWorldwideDistanceKm = 20000;
 
   static const String supportEmail = 'support@loveme-app.com';
 }

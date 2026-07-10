@@ -3,8 +3,13 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 /// Likes & passes (swipe actions) — live against `likes`/`passes`
 /// (migration 003_matching.sql / 004_matching_rls.sql).
 ///
-/// No `matches` insert here: matches are system-created by a mutual-like
-/// trigger that hasn't shipped yet (see migration_002.md §1/§8).
+/// No `matches` insert here: a mutual like is turned into a `matches` row
+/// (and a `conversations` row) automatically by the live `SECURITY DEFINER`
+/// triggers `create_match_on_mutual_like` + `create_conversation_on_match`
+/// (migrations 014/011, deployed & verified 2026-07-10). So a `likeProfile`
+/// that completes the pair simply succeeds — the match/conversation appear
+/// server-side and surface via the realtime subscriptions in
+/// [MatchRepository.subscribeToNewMatches] / the Likes screen.
 abstract interface class SwipeRepository {
   Future<void> likeProfile(String toUserId);
   Future<void> passProfile(String toUserId);

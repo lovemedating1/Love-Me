@@ -9,14 +9,18 @@ import '../../core/theme/app_colors.dart';
 import '../../shared/data/repositories.dart';
 import '../../shared/models/match.dart';
 import '../../shared/models/profile.dart';
-import '../../shared/widgets/profile_tile.dart';
+import '../../shared/widgets/app_avatar.dart';
+import '../../shared/widgets/profile_preview_modal.dart';
 import '../../shared/widgets/state_views.dart';
 
-/// 07 — LikesPage (tab body). Two tabs: Liked You (premium-gated blur) & Matches.
+/// 07 — LikesPage (tab body). "People Who Like You" — a vertical list.
 ///
-/// Subscribes to the `matches` table for the whole screen's lifetime so a
-/// newly-created match (once the mutual-like trigger ships server-side —
-/// see migration_002.md §1/§8) pops the "It's a Match!" overlay live.
+/// Rebuilt for UI parity (Phase 3, `WA0035`) — see UI_REBUILD_PLAN.md §3.3.
+/// Per Phase 0 §0.4 (#1/#2), the old app has **no Matches tab and no blurred
+/// premium grid** here, so both are removed: this is now a single list with
+/// a plan banner. New matches still surface live via the realtime
+/// subscription below — they just pop the "It's a Match!" dialog and drop
+/// the user into chat instead of a separate tab.
 class LikesScreen extends ConsumerStatefulWidget {
   const LikesScreen({super.key});
 
@@ -31,7 +35,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
   void initState() {
     super.initState();
     _channel = ref.read(matchRepositoryProvider).subscribeToNewMatches((match) {
-      ref.invalidate(matchesProvider);
+      ref.invalidate(likedYouProvider);
       _showMatch(match);
     });
   }
@@ -106,239 +110,110 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          const TabBar(tabs: [Tab(text: 'Liked You'), Tab(text: 'Matches')]),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _LikedYouTab(),
-                _MatchesTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LikedYouTab extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
     final likes = ref.watch(likedYouProvider);
     final isPremium = ref.watch(isPremiumProvider);
     return likes.when(
-      loading: () => const _GridSkeleton(),
+      loading: () => _listSkeleton(),
       error: (_, _) => ErrorView(
           message: 'Could not load likes.',
           onRetry: () => ref.invalidate(likedYouProvider)),
-      data: (people) {
-        if (people.isEmpty) {
-          return const EmptyView(
-              icon: LucideIcons.heart,
-              message: 'No likes yet — keep swiping!');
-        }
-        return Column(
-          children: [
-            if (!isPremium)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.crown, color: Color(0xFFFFB800)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text('${people.length} people liked you',
-                          style: Theme.of(context).textTheme.titleMedium),
-                    ),
-                    FilledButton(
-                      onPressed: () => context.push(RoutePaths.subscription),
-                      child: const Text('Unlock'),
-                    ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: _grid(people, blurred: !isPremium, onTap: (p) {
-                if (!isPremium) {
-                  context.push(RoutePaths.subscription);
-                } else {
-                  context.push(RoutePaths.chatTo(p.userId));
-                }
-              }),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _MatchesTab extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final matches = ref.watch(matchesProvider);
-    return matches.when(
-      loading: () => const _GridSkeleton(),
-      error: (_, _) => ErrorView(
-          message: 'Could not load matches.',
-          onRetry: () => ref.invalidate(matchesProvider)),
-      data: (people) {
-        if (people.isEmpty) {
-          return const EmptyView(
-              icon: LucideIcons.sparkles, message: 'No matches yet.');
-        }
-        return _grid(people,
-            overlayIcon: LucideIcons.messageCircle,
-            onTap: (p) => context.push(RoutePaths.chatTo(p.userId)),
-            onLongPress: (p) => _matchActions(context, ref, p));
-      },
+      data: (people) => _content(context, people, isPremium),
     );
   }
 
-  /// Long-press a match → unmatch or block. Both are `matches` UPDATEs; the
-  /// row is never deleted (soft status change), per migration_002.md §4.
-  void _matchActions(BuildContext context, WidgetRef ref, Profile partner) {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(LucideIcons.userMinus),
-              title: Text('Unmatch ${partner.name}'),
-              subtitle: const Text("You'll both be removed from each other's matches."),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmMatchAction(context, ref, partner, block: false);
-              },
+  Widget _content(BuildContext context, List<Profile> people, bool isPremium) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        Text('People Who Like You',
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text('Viewing all ${people.length} likes',
+            style: const TextStyle(color: AppColors.mutedFg)),
+        const SizedBox(height: 14),
+        if (isPremium)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: AppColors.pink,
+              borderRadius: BorderRadius.circular(999),
             ),
-            ListTile(
-              leading: const Icon(LucideIcons.ban, color: AppColors.destructive),
-              title: Text('Block ${partner.name}',
-                  style: const TextStyle(color: AppColors.destructive)),
-              subtitle: const Text('They will no longer be able to contact you.'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmMatchAction(context, ref, partner, block: true);
-              },
+            child: const Row(
+              children: [
+                Icon(LucideIcons.crown, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Gold Plan',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w700)),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmMatchAction(
-      BuildContext context, WidgetRef ref, Profile partner,
-      {required bool block}) async {
-    final verb = block ? 'Block' : 'Unmatch';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('$verb ${partner.name}?'),
-        content: Text(block
-            ? 'They won\'t be able to message you or see your profile. This '
-                'cannot be undone from the app.'
-            : 'This removes the match for both of you and cannot be undone.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.destructive),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(verb),
           ),
-        ],
-      ),
+        if (people.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 60),
+            child: EmptyView(
+                icon: LucideIcons.heart,
+                message: 'No likes yet — keep swiping!'),
+          )
+        else
+          for (final p in people) _likeRow(context, p),
+      ],
     );
-    if (confirmed != true) return;
-
-    try {
-      // Resolve the match row for this partner (matchesProvider only gives us
-      // the partner's Profile; unmatch/block key off the match id).
-      final myId = ref.read(currentUserProvider).valueOrNull?.userId;
-      final rows = await ref.read(myMatchRowsProvider.future);
-      final match = rows
-          .where((m) => myId != null && m.otherUserId(myId) == partner.userId)
-          .firstOrNull;
-      if (match == null) {
-        if (context.mounted) _snack(context, 'Could not find that match.');
-        return;
-      }
-
-      final repo = ref.read(matchRepositoryProvider);
-      if (block) {
-        await repo.block(match.id);
-      } else {
-        await repo.unmatch(match.id);
-      }
-
-      ref.invalidate(matchesProvider);
-      ref.invalidate(myMatchRowsProvider);
-      ref.invalidate(conversationsProvider);
-      if (context.mounted) {
-        _snack(context, block
-            ? '${partner.name} has been blocked.'
-            : 'Unmatched ${partner.name}.');
-      }
-    } catch (_) {
-      if (context.mounted) _snack(context, 'Could not $verb — try again.');
-    }
   }
 
-  void _snack(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-          SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating));
-  }
-}
+  Widget _likeRow(BuildContext context, Profile p) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Material(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => ProfilePreviewModal.show(context, p),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  AppAvatar(photoUrl: p.photoUrl, size: 52, isVerified: p.isVerified),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(p.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text('${p.city}, ${p.country}',
+                            style: const TextStyle(
+                                color: AppColors.mutedFg, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  Text(p.ageLabel,
+                      style: const TextStyle(
+                          color: AppColors.mutedFg, fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 6),
+                  const Icon(LucideIcons.chevronRight,
+                      size: 18, color: AppColors.mutedFg),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 
-Widget _grid(List<Profile> people,
-        {bool blurred = false,
-        IconData? overlayIcon,
-        void Function(Profile)? onLongPress,
-        required void Function(Profile) onTap}) =>
-    GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-      ),
-      itemCount: people.length,
-      itemBuilder: (_, i) => ProfileTile(
-        profile: people[i],
-        blurred: blurred,
-        overlayIcon: overlayIcon,
-        onTap: () => onTap(people[i]),
-        onLongPress:
-            onLongPress == null ? null : () => onLongPress(people[i]),
-      ),
-    );
-
-class _GridSkeleton extends StatelessWidget {
-  const _GridSkeleton();
-  @override
-  Widget build(BuildContext context) => GridView.count(
-        padding: const EdgeInsets.all(12),
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
+  Widget _listSkeleton() => ListView(
+        padding: const EdgeInsets.all(16),
         children: List.generate(
-            6, (_) => const SkeletonBox(height: double.infinity, radius: 16)),
+          6,
+          (_) => const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: SkeletonBox(height: 74, radius: 16),
+          ),
+        ),
       );
 }

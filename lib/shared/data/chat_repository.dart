@@ -7,26 +7,35 @@ import '../models/message.dart';
 import '../models/message_reaction.dart';
 import 'profile_photo_repository.dart' show mapStorageError;
 
-/// Supabase Storage buckets for chat media (per the backend spec §9). All are
-/// **private** — reads go through signed URLs. **Must exist in the project.**
+/// Supabase Storage buckets for chat media (live 2026-07-10, per the backend
+/// deploy memo §1). All are **private** — reads go through short-lived signed
+/// URLs minted on demand.
 const kChatImagesBucket = 'chat-images';
 const kChatVideosBucket = 'chat-files'; // spec groups non-image media here
 const kChatThumbsBucket = 'chat-file-thumbs';
 const kVoiceMessagesBucket = 'voice-messages';
 
 /// A media file uploaded to storage, ready to attach to a message.
+///
+/// [mediaPath] / [thumbnailPath] are **object paths** inside the private
+/// bucket (`<conversationId>/<uuid>.<ext>`), NOT URLs. They are what gets
+/// stored in `messages.media_url` / `messages.thumbnail_url`, so the media
+/// never expires — a fresh signed URL is minted at render time via
+/// [ChatRepository.signedUrlFor] (backend deploy memo §5, open question 1:
+/// "store object paths instead of 7-day signed URLs").
 class UploadedChatMedia {
-  const UploadedChatMedia({required this.mediaUrl, this.thumbnailUrl});
-  final String mediaUrl;
-  final String? thumbnailUrl;
+  const UploadedChatMedia({required this.mediaPath, this.thumbnailPath});
+  final String mediaPath;
+  final String? thumbnailPath;
 }
 
 /// Chat — live against `messages`/`message_reads`/`message_reactions`
-/// (migration 005_chat.sql / 006_chat_rls.sql) + chat-media storage buckets.
+/// (migration 005_chat.sql / 006_chat_rls.sql) + the 5 chat-media storage
+/// buckets (live 2026-07-10).
 ///
-/// IMPORTANT: this only works for a conversation that already exists.
-/// `conversations` has no INSERT policy and no trigger yet auto-creates one
-/// when a match forms — see ConversationRepository and migration_003.md §1/§9.
+/// A conversation is auto-created for every match by the live
+/// `create_conversation_on_match` trigger, so any active match can send
+/// media — see ConversationRepository.
 abstract interface class ChatRepository {
   Future<List<ChatMessage>> getMessages(String conversationId, {int limit = 50});
 
@@ -36,8 +45,8 @@ abstract interface class ChatRepository {
     String? replyToMessageId,
   });
 
-  /// Uploads a chat image to `chat-images` and returns a signed URL to store
-  /// as the message's `media_url`.
+  /// Uploads a chat image to `chat-images` and returns its **object path**
+  /// (to store as the message's `media_url`; render with [signedUrlFor]).
   Future<UploadedChatMedia> uploadChatImage(
     String conversationId,
     Uint8List bytes, {
@@ -45,7 +54,7 @@ abstract interface class ChatRepository {
   });
 
   /// Uploads a chat video (to `chat-files`) + its thumbnail (to
-  /// `chat-file-thumbs`) and returns both signed URLs.
+  /// `chat-file-thumbs`) and returns both **object paths**.
   Future<UploadedChatMedia> uploadChatVideo(
     String conversationId,
     Uint8List bytes, {
@@ -53,12 +62,19 @@ abstract interface class ChatRepository {
     required Uint8List thumbnailBytes,
   });
 
-  /// Uploads a voice message (m4a) to `voice-messages`.
+  /// Uploads a voice message (m4a) to `voice-messages`; returns its path.
   Future<UploadedChatMedia> uploadVoice(
     String conversationId,
     Uint8List bytes, {
     String fileExtension = 'm4a',
   });
+
+  /// Mints a fresh, short-lived signed URL for a stored media object [path].
+  /// [bucketForType] picks the right private bucket from the message type.
+  /// Returns `null` if [path] is null/empty. Media paths are stored (not
+  /// URLs), so this is called every time a media bubble renders.
+  Future<String?> signedUrlFor(String? path, MessageType type,
+      {bool thumbnail = false});
 
   Future<ChatMessage> sendMediaMessage({
     required String conversationId,
@@ -106,8 +122,14 @@ class SupabaseChatRepository implements ChatRepository {
 
   sb.SupabaseClient get _client => sb.Supabase.instance.client;
 
-  static const _signedUrlTtl = 60 * 60 * 24 * 7; // 7 days
+  /// Signed-URL lifetime for on-render media reads. Short (1 hour) because
+  /// URLs are minted fresh each time a bubble renders — we store the object
+  /// path, not the URL, so there's no need for a long-lived token.
+  static const _signedUrlTtl = 60 * 60; // 1 hour
 
+  /// Uploads bytes to a private chat bucket and returns the **object path**
+  /// (not a URL). Callers store this path in the message row and render it
+  /// via [signedUrlFor].
   Future<String> _uploadPrivate(
     String bucket,
     String conversationId,
@@ -122,9 +144,37 @@ class SupabaseChatRepository implements ChatRepository {
             bytes,
             fileOptions: sb.FileOptions(contentType: contentType, upsert: true),
           );
-      return _client.storage.from(bucket).createSignedUrl(path, _signedUrlTtl);
+      return path;
     } catch (e) {
       throw mapStorageError(e, bucket);
+    }
+  }
+
+  /// Which private bucket a given media path lives in, derived from the
+  /// message type (thumbnails always live in `chat-file-thumbs`).
+  String _bucketFor(MessageType type, {required bool thumbnail}) {
+    if (thumbnail) return kChatThumbsBucket;
+    return switch (type) {
+      MessageType.image => kChatImagesBucket,
+      MessageType.video => kChatVideosBucket,
+      MessageType.audio => kVoiceMessagesBucket,
+      _ => kChatImagesBucket,
+    };
+  }
+
+  @override
+  Future<String?> signedUrlFor(String? path, MessageType type,
+      {bool thumbnail = false}) async {
+    if (path == null || path.isEmpty) return null;
+    // Legacy rows may still hold a full signed/public URL rather than a bare
+    // object path — pass those through unchanged so old messages keep working.
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    final bucket = _bucketFor(type, thumbnail: thumbnail);
+    try {
+      return await _client.storage.from(bucket).createSignedUrl(path, _signedUrlTtl);
+    } catch (_) {
+      // Non-fatal: a missing/denied object just renders the error placeholder.
+      return null;
     }
   }
 
@@ -137,9 +187,9 @@ class SupabaseChatRepository implements ChatRepository {
     final contentType = fileExtension == 'png'
         ? 'image/png'
         : (fileExtension == 'webp' ? 'image/webp' : 'image/jpeg');
-    final url = await _uploadPrivate(
+    final path = await _uploadPrivate(
         kChatImagesBucket, conversationId, bytes, fileExtension, contentType);
-    return UploadedChatMedia(mediaUrl: url);
+    return UploadedChatMedia(mediaPath: path);
   }
 
   @override
@@ -149,11 +199,11 @@ class SupabaseChatRepository implements ChatRepository {
     required String fileExtension,
     required Uint8List thumbnailBytes,
   }) async {
-    final mediaUrl = await _uploadPrivate(kChatVideosBucket, conversationId,
+    final mediaPath = await _uploadPrivate(kChatVideosBucket, conversationId,
         bytes, fileExtension, 'video/mp4');
-    final thumbUrl = await _uploadPrivate(kChatThumbsBucket, conversationId,
+    final thumbPath = await _uploadPrivate(kChatThumbsBucket, conversationId,
         thumbnailBytes, 'jpg', 'image/jpeg');
-    return UploadedChatMedia(mediaUrl: mediaUrl, thumbnailUrl: thumbUrl);
+    return UploadedChatMedia(mediaPath: mediaPath, thumbnailPath: thumbPath);
   }
 
   @override
@@ -162,9 +212,9 @@ class SupabaseChatRepository implements ChatRepository {
     Uint8List bytes, {
     String fileExtension = 'm4a',
   }) async {
-    final url = await _uploadPrivate(kVoiceMessagesBucket, conversationId,
+    final path = await _uploadPrivate(kVoiceMessagesBucket, conversationId,
         bytes, fileExtension, 'audio/mp4');
-    return UploadedChatMedia(mediaUrl: url);
+    return UploadedChatMedia(mediaPath: path);
   }
 
   @override

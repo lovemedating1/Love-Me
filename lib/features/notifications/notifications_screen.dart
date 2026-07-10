@@ -9,39 +9,27 @@ import '../../core/utils/date_format.dart';
 import '../../shared/data/repositories.dart';
 import '../../shared/models/app_notification.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/sub_page_header.dart';
 
-/// 12 — NotificationsPage. Activity feed with typed rows, unread dots.
+/// 12 — NotificationsPage.
+///
+/// Rebuilt for UI parity (Phase 5, `WA0037`) — see UI_REBUILD_PLAN.md §5.3:
+/// absolute dates instead of relative ("6/19/2026"), pale-pink circular
+/// icons, and the unread dots / "Mark all read" / swipe-delete all removed
+/// (the old app has none of them — it's a plain read-only activity feed;
+/// rows still tap through to their deep link).
 ///
 /// No realtime yet (per migration_004.md) — the feed is refreshed manually
 /// (pull-to-refresh / provider invalidation), not push-updated. The client
-/// can mark-read/delete but never creates notifications.
+/// can mark-read but never creates notifications.
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
-
-  Future<void> _markAllRead(WidgetRef ref, List<AppNotification> all) async {
-    final repo = ref.read(notificationRepositoryProvider);
-    for (final n in all.where((n) => !n.isRead)) {
-      await repo.markAsRead(n.id);
-    }
-    ref.invalidate(notificationsProvider);
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifs = ref.watch(notificationsProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              final data = notifs.valueOrNull ?? const [];
-              _markAllRead(ref, data);
-            },
-            child: const Text('Mark all read'),
-          ),
-        ],
-      ),
+      appBar: const SubPageHeader(title: 'Notifications'),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(notificationsProvider);
@@ -61,6 +49,7 @@ class NotificationsScreen extends ConsumerWidget {
               ]);
             }
             return ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: list.length,
               separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
               itemBuilder: (_, i) => _row(context, ref, list[i]),
@@ -74,52 +63,24 @@ class NotificationsScreen extends ConsumerWidget {
   Widget _row(BuildContext context, WidgetRef ref, AppNotification n) {
     final theme = Theme.of(context);
     final (icon, color) = _iconFor(n.type);
-    return Dismissible(
-      key: ValueKey(n.id),
-      background: Container(
-        color: AppColors.destructive,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: const Icon(LucideIcons.trash2, color: Colors.white),
-      ),
-      direction: DismissDirection.endToStart,
-      onDismissed: (_) async {
-        await ref.read(notificationRepositoryProvider).delete(n.id);
-        ref.invalidate(notificationsProvider);
+    return ListTile(
+      onTap: () async {
+        if (!n.isRead) {
+          await ref.read(notificationRepositoryProvider).markAsRead(n.id);
+          ref.invalidate(notificationsProvider);
+        }
+        if (context.mounted) _deepLink(context, n);
       },
-      child: ListTile(
-        onTap: () async {
-          if (!n.isRead) {
-            await ref.read(notificationRepositoryProvider).markAsRead(n.id);
-            ref.invalidate(notificationsProvider);
-          }
-          if (context.mounted) _deepLink(context, n);
-        },
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.15),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        title: Text(n.title,
-            style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: n.isRead ? FontWeight.w500 : FontWeight.w700)),
-        subtitle: Text(n.body, maxLines: 2, overflow: TextOverflow.ellipsis),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(RelativeTime.short(n.createdAt),
-                style: theme.textTheme.labelSmall),
-            const SizedBox(height: 6),
-            if (!n.isRead)
-              Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(
-                    color: AppColors.pink, shape: BoxShape.circle),
-              ),
-          ],
-        ),
+      leading: CircleAvatar(
+        backgroundColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.35),
+        child: Icon(icon, color: color, size: 20),
       ),
+      title: Text(n.title,
+          style: theme.textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w600)),
+      subtitle: Text(n.body, maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing: Text(RelativeTime.absolute(n.createdAt),
+          style: theme.textTheme.labelSmall),
     );
   }
 

@@ -27,7 +27,21 @@ class AppGradients {
     colors: [AppColors.gold, AppColors.goldWarm],
   );
 
-  
+  /// Primary CTA buttons — deep pink → hot pink, left→right (old app style).
+  static const LinearGradient cta = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [AppColors.pinkDeep, AppColors.pinkSoft],
+  );
+
+  /// Profile "Manage Plan" card — hot pink → orange.
+  static const LinearGradient managePlan = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [AppColors.pink, AppColors.orange],
+  );
+
+
 
   /// Animated VIP tier label (use with a shimmer/animation later).
   static const LinearGradient vip = LinearGradient(

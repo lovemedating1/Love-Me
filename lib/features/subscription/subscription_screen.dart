@@ -4,13 +4,21 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_gradients.dart';
+import '../../core/theme/app_theme.dart';
 import '../../shared/data/mock_data.dart';
 import '../../shared/data/repositories.dart';
 import '../../shared/models/subscription_plan.dart';
+import '../../shared/widgets/gradient_button.dart';
+import '../../shared/widgets/sub_page_header.dart';
 
-/// 15 — SubscriptionPage. Perks, plan cards (duration tiers — PLACEHOLDER names,
-/// see SubscriptionPlan doc note), payment-method buttons (UI only), trial usage.
+/// 15 — SubscriptionPage.
+///
+/// Rebuilt for UI parity (Phase 4, `WA0038`/`WA0039`) — see
+/// UI_REBUILD_PLAN.md §4.2. Real 5-tier plans (locked in Phase 0 §0.2),
+/// tier badges, a green "CURRENT" ribbon on the active plan, the M-PESA
+/// payment button, and the Wise receipt-upload button (kept per Phase 0
+/// §0.1 — not deleted, but not functional: no `verify-receipt-upload`
+/// backend exists yet, see BACKEND_REMAINING.md [BE-4]).
 class SubscriptionScreen extends ConsumerStatefulWidget {
   const SubscriptionScreen({super.key});
 
@@ -20,8 +28,12 @@ class SubscriptionScreen extends ConsumerStatefulWidget {
 }
 
 class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
-  String _selectedPlan = 'quarterly';
+  bool _billingExpanded = false;
   bool _processing = false;
+
+  /// Placeholder "current plan" — same assumption the Profile card makes
+  /// (Gold) until real subscription-tier tracking exists on `profiles`.
+  static const _currentPlanId = 'gold';
 
   Future<void> _checkout(String method) async {
     setState(() => _processing = true);
@@ -39,188 +51,267 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     context.pop();
   }
 
+  void _receiptToast() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+        content: Text('Receipt upload isn\'t available yet — coming soon.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isPremium = ref.watch(isPremiumProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Go Premium'),
-        leading: IconButton(
-            icon: const Icon(LucideIcons.x), onPressed: () => context.pop()),
+      appBar: SubPageHeader(
+        title: 'Choose Your Plan',
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(LucideIcons.crown, color: Colors.white, size: 18),
+                SizedBox(width: 4),
+                Flexible(
+                  child: Text('Unlock Premium',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _hero(theme),
-          const SizedBox(height: 20),
-          Text('Choose your plan', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 12),
+          if (isPremium) _renewalBanner(theme),
+          if (isPremium) const SizedBox(height: 16),
           for (final plan in MockData.plans) _planCard(theme, plan),
-          const SizedBox(height: 20),
-          Text('Payment method', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 12),
-          _payButton('Pay with M-PESA / Card', LucideIcons.smartphone, 'Paystack'),
-          _payButton('PayPal', LucideIcons.wallet, 'PayPal'),
-          _payButton('Wise (bank transfer)', LucideIcons.landmark, 'Wise'),
-          _payButton('Google Play Billing', LucideIcons.play, 'Google Play'),
-          const SizedBox(height: 20),
-          Text('Your free usage', style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
-          _usage(theme, 'Likes today', 34, 50),
-          _usage(theme, 'Profile views this month', 41, 50),
-          const SizedBox(height: 16),
+          _billingExpander(theme),
+          const SizedBox(height: 20),
+          GradientButton(
+            label: 'Pay with M-PESA / Airtel Money',
+            icon: LucideIcons.smartphone,
+            onPressed: _processing ? null : () => _checkout('M-PESA / Airtel Money'),
+            loading: _processing,
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _receiptToast,
+            icon: const Icon(LucideIcons.upload),
+            label: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Upload Order Receipt Screenshot')),
+            style: OutlinedButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                minimumSize: const Size.fromHeight(52)),
+          ),
+          const SizedBox(height: 20),
           Center(
             child: Text(
               'Cancel anytime · Terms & Refund policy apply',
               style: theme.textTheme.bodySmall,
             ),
           ),
+          const SizedBox(height: 16),
+          Center(
+            child: Text('Made with ♥ By Randy',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: AppColors.mutedFg)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _hero(ThemeData theme) => Container(
-        padding: const EdgeInsets.all(20),
+  Widget _renewalBanner(ThemeData theme) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-            gradient: AppGradients.premium,
-            borderRadius: BorderRadius.circular(20)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(LucideIcons.crown, color: Colors.white, size: 28),
-                SizedBox(width: 8),
-                Text('Love Me Premium',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            for (final perk in MockData.premiumPerks)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.check, color: Colors.white, size: 18),
-                    const SizedBox(width: 8),
-                    Text(perk, style: const TextStyle(color: Colors.white)),
-                  ],
-                ),
-              ),
-          ],
+          color: AppColors.success.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
         ),
-      );
-
-  Widget _planCard(ThemeData theme, SubscriptionPlan plan) {
-    final selected = _selectedPlan == plan.id;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedPlan = plan.id),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.pink : theme.colorScheme.outline,
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Row(
+        child: const Row(
           children: [
-            Icon(
-              selected ? LucideIcons.circleCheck : LucideIcons.circle,
-              color: selected ? AppColors.pink : theme.colorScheme.outline,
-            ),
-            const SizedBox(width: 12),
+            Icon(LucideIcons.circleCheck, color: AppColors.success),
+            SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(plan.name, style: theme.textTheme.titleMedium),
-                      if (plan.popular) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                              gradient: AppGradients.gold,
-                              borderRadius: BorderRadius.circular(999)),
-                          child: const Text('Most Popular',
-                              style: TextStyle(
-                                  fontSize: 10, fontWeight: FontWeight.w700)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (plan.savingsLabel != null)
-                    Text(plan.savingsLabel!,
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: AppColors.success)),
+                  Text("You're Currently on this Gold Plan",
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text('Renews monthly',
+                      style: TextStyle(color: AppColors.mutedFg, fontSize: 12)),
                 ],
               ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('\$${plan.priceUsd.toStringAsFixed(2)}',
-                    style: theme.textTheme.titleLarge),
-                Text('/ ${plan.period}', style: theme.textTheme.bodySmall),
-              ],
+          ],
+        ),
+      );
+
+  Color _badgeColor(String? badge) => switch (badge) {
+        'Silver' => AppColors.tierSilver,
+        'Gold' => AppColors.tierGold,
+        'Diamond' => AppColors.tierDiamond,
+        'Crown' => AppColors.tierCrown,
+        'VIP' => AppColors.tierVip,
+        _ => AppColors.mutedFg,
+      };
+
+  Widget _planCard(ThemeData theme, SubscriptionPlan plan) {
+    final isCurrent = plan.id == _currentPlanId;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 16, top: 6),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isCurrent
+                ? const Color(0xFFFFF3E8)
+                : theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isCurrent ? AppColors.success : theme.colorScheme.outline,
+              width: isCurrent ? 2 : 1,
             ),
+            boxShadow: AppTheme.cardShadow,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(plan.name,
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w800)),
+                        if (plan.badge != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _badgeColor(plan.badge),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(plan.badge!,
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white)),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      plan.profileLimit == null
+                          ? 'Unlimited profiles'
+                          : '${plan.profileLimit} profiles',
+                      style: const TextStyle(color: AppColors.mutedFg, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(LucideIcons.info, size: 18),
+                tooltip: '${plan.name}: ${plan.profileLimit?.toString() ?? "Unlimited"} profiles/month',
+                onPressed: () => _planInfo(context, plan),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('\$${plan.priceUsd.toStringAsFixed(0)}',
+                      style: theme.textTheme.titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('/mo', style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (isCurrent)
+          Positioned(
+            top: -6,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.success,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text('✓ CURRENT',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _planInfo(BuildContext context, SubscriptionPlan plan) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${plan.name} — \$${plan.priceUsd.toStringAsFixed(0)}/mo',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(plan.profileLimit == null
+                ? 'Unlimited profile views per month.'
+                : '${plan.profileLimit} profile views per month.'),
           ],
         ),
       ),
     );
   }
 
-  Widget _payButton(String label, IconData icon, String method) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: OutlinedButton.icon(
-          onPressed: _processing ? null : () => _checkout(method),
-          icon: _processing
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : Icon(icon),
-          label: Align(
-              alignment: Alignment.centerLeft, child: Text(label)),
-          style: OutlinedButton.styleFrom(
-              alignment: Alignment.centerLeft,
-              minimumSize: const Size.fromHeight(52)),
-        ),
-      );
-
-  Widget _usage(ThemeData theme, String label, int used, int cap) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(label, style: theme.textTheme.bodyMedium),
-                Text('$used / $cap', style: theme.textTheme.labelSmall),
-              ],
-            ),
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: used / cap,
-                minHeight: 8,
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                color: AppColors.pink,
+  Widget _billingExpander(ThemeData theme) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _billingExpanded = !_billingExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Checkout Section/Billing',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                  Icon(_billingExpanded
+                      ? LucideIcons.chevronUp
+                      : LucideIcons.chevronDown),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          if (_billingExpanded)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Billed monthly. Cancel anytime from Settings → Subscription. '
+                'Prices shown in USD; local currency conversion applied at checkout.',
+                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.mutedFg),
+              ),
+            ),
+        ],
       );
 }

@@ -1153,3 +1153,1005 @@ Known items to resolve before / during build (from spec analysis):
     - Views stat once a "who viewed me" RPC exists.
     - Bio field once [BE-13] adds the column.
     - Calls tab is history-only until WebRTC/calling UX is built.
+
+[2026-07-10] UI PARITY: gap analysis vs old app + 5-phase rebuild plan (DOCS ONLY, no code)
+  Reviewed every file in `app doctumant/old app ss/` (52 files -> 40 unique screens;
+    12 were byte-identical duplicates, e.g. 4.jpeg == WA0030.jpg), then cross-read
+    the whole lib/ source. No code changed this session.
+  NEW DOCS:
+    - app doctumant/UI_GAP_ANALYSIS.md  — 19 sections. Screen-by-screen diff of the
+      old app vs our rebuild, tagged MISSING / DIFFERENT / EXTRA / MATCHES. Includes
+      15 screens+modals the old app has that we don't, 17 things we have that it
+      doesn't (removal candidates), and a global design-system delta table.
+    - app doctumant/UI_REBUILD_PLAN.md  — the executable 5-phase plan with a
+      Progress Tracker (checkboxes) so work can resume in a fresh chat. Phase 0 is a
+      decisions/blockers gate needing user answers.
+  THREE FINDINGS THAT CHANGE PROJECT DECISIONS:
+    1. PLAN NAMES ARE FINALLY SETTLED (the blocker open since day one). The old app's
+       subscription screen (WA0066/WA0032/WA0038) shows: Basic+ $5 (500 profiles,
+       Silver) / Gold $10 (1000, Gold) / Platinum $15 (1500, Diamond) / Premium Elite
+       $20 (2000, Crown) / VIP Elite $25 (unlimited, VIP). This matches the product
+       roadmap, NOT the backend doc (Premium/VIP/Elite) and NOT our placeholder
+       (Monthly/Quarterly/Yearly). Our MockData.plans is wrong.
+    2. Two screenshots carry hand-drawn pen annotations, read as instructions but
+       NOT yet confirmed by the user: WA0038 crosses out "Upload Order Receipt
+       Screenshot" (=> remove the Wise receipt upload?); WA0050/55/60 circle the
+       header 36d/22d pills and the bell (=> these are required).
+    3. MY EARLIER MISTAKE, now caught: in the Group-A pass I deleted the Sound and
+       Vibration toggles from Settings because no DB column existed. WA0044/WA0049
+       show the old app DOES have "Vibrate on incoming call" and a ringtone preview —
+       they are DEVICE-LOCAL settings, which is exactly why there's no column. They
+       should be restored via shared_preferences (already installed).
+  Biggest UI gaps found (summary):
+    - App header: theirs is personalized (avatar, "Hi, {name}", GPS ward, 36d + 22d
+      countdown pills, bell on every tab). Ours is a static "Love Me" wordmark.
+    - Discover card: photo carousel + side thumbnail rail, marital-status chip, Report
+      pill, "10h ago" last-active, distance in km AND mi, "Approx" GPS badge, coloured
+      tag chips, "Show more", and 4 SOLID colour circle buttons (order X/star/chat/heart
+      — heart & chat are swapped vs ours). Ours is one photo + outline buttons + labels.
+    - Likes: theirs is a LIST + a profile-preview modal; ours is a blurred grid with a
+      Matches tab they don't have.
+    - Explore: search + ALL ~195 countries in a 3-col flag grid -> country modal ->
+      profile modal. Ours: 8 hardcoded horizontal chips.
+    - Profile: white card + gradient "Manage Plan" card + only 3 rows. Ours: gradient
+      banner + stats row + gallery + 5 rows + demo toggle.
+    - Settings: card sections incl. Subscription (w/ Download Receipt PDF), ID
+      Verification (4 doc types + selfie), and Help & Support/FAQ — we have none of
+      those three. Also their Push Notifications is ONE toggle; ours is eight.
+    - Legal: they have real Terms/Privacy/Child-Safety copy incl. the Google Play CSAE
+      compliance statement and a "Report CSAM" button. OURS IS LOREM IPSUM — this is a
+      Play Store launch blocker.
+    - Auth: no card, "Login" not "Sign In", min 6 chars (we enforce 8), no confirm-
+      password / DOB / gender / country / Google button at signup, has a "Refresh" link.
+  Phase structure agreed: 0 Decisions -> 1 Design system + global shell -> 2 Discover ->
+    3 Profile/Likes/Explore -> 4 Settings/Subscription/Messages+Chat -> 5 Legal/modals/
+    cleanup. One phase at a time, await user "go" between phases.
+  Constraint carried into the plan: several elements have NO data source yet (account-
+    expiry field doesn't exist at all; last_seen/presence unread; multi-photo feed;
+    real distance; country counts; reports table). Rule adopted: when data is missing,
+    HIDE the element — never fake a number.
+  Verification: no code touched; `flutter analyze` / `flutter test` unchanged from the
+    previous entry (green).
+  Next: user answers Phase 0 (esp. plan adoption, pen annotations, legal copy, and the
+    keep/delete list), then Phase 1 begins.
+
+[2026-07-10] UI PARITY — PHASE 0 (decisions) + PHASE 1 (design system + global shell)
+  PHASE 0 — user decisions, now LOCKED in UI_REBUILD_PLAN.md:
+    0.1 Pen marks: BUILD the 36d/22d header pills + bell. KEEP the "Upload Order
+        Receipt Screenshot" button (the blue X was NOT a delete instruction).
+    0.2 Plans ADOPTED exactly: Basic+ $5/500 (Silver), Gold $10/1000 (Gold),
+        Platinum $15/1500 (Diamond), Premium Elite $20/2000 (Crown),
+        VIP Elite $25/unlimited (VIP). Free tier's limit still unknown -> ask backend.
+    0.3 Legal copy DEFERRED (user supplies later). Phase 5.1 stays blocked.
+        STILL A PLAY STORE LAUNCH BLOCKER.
+    0.4 Rule adopted: "MATCH THE OLD APP EXACTLY — if the old app doesn't have it,
+        remove it." 14-item delete/change list recorded in the plan, each mapped to
+        the phase that executes it.
+    0.5 Restore Vibration + ringtone as DEVICE-LOCAL settings (my earlier error).
+    0.6 No screenshots for onboarding/matches/forgot-pw/404/admin/in-call -> those
+        screens stay as-is.
+
+  CORRECTION FIRST (my Group-A mistake, per 0.5):
+    - lib/core/settings/local_settings_controller.dart (NEW): LocalSettings +
+      LocalSettingsController (Riverpod Notifier) persisting to SharedPreferences:
+      `vibrateOnCall` (bool) and `ringtone` (CallRingtone enum: classic/modern/
+      marimba, each with the old app's description text). These have NO DB column
+      because they describe the phone, not the account — which is exactly why I
+      wrongly deleted them before.
+    - settings_screen.dart: restored a "Call Ringtone" section (dropdown showing the
+      selected ringtone's description + a ▶ preview button, currently DISABLED — no
+      audio assets/player yet, wired in Phase 4) and a "Vibration" section
+      ("Vibrate on incoming call"). Removed the leftover mock `_ringtone`/`_ringtones`
+      fields.
+
+  PHASE 1 — DESIGN SYSTEM + GLOBAL SHELL (done):
+    1.1 Tokens (core/theme/):
+      - app_colors.dart: primary pink warmed #E6287A -> #FF1F8E (old app's hot pink);
+        added pinkDeep, orange (Manage-Plan gradient end), a chip palette
+        (yellow/pink/grey bg+fg), and 5 subscription tier-badge colours
+        (Silver/Gold/Diamond/Crown/VIP). Page bg -> #FDEEF4; cards now pure white.
+      - app_gradients.dart: added `cta` (deep pink -> hot pink, for buttons) and
+        `managePlan` (hot pink -> orange).
+      - app_theme.dart: buttons are now fully-rounded StadiumBorder pills (52px min);
+        cards radius 20 + margin; inputs radius 16; added `cardShadow` token and a
+        SwitchTheme (large, pink-filled track).
+    1.2 New shared widgets:
+      - gradient_button.dart — the old app's primary CTA (gradient fill, pill shape,
+        pink glow shadow, loading state, optional icon).
+      - app_chip.dart — the multi-colour pill (yellow/pink/grey/dark/outlinePink)
+        with optional leading icon + trailing emoji. Used heavily in Phase 2/3.
+      - segmented_tabs.dart — pill tab switcher with an optional pink count badge
+        (replaces Material TabBar on Messages in Phase 4).
+      - sub_page_header.dart — pink-gradient second-level header + a reusable
+        `CircleIconButton` (translucent circular icon button used by the header,
+        the bell, and chat's phone/video/shield buttons).
+    1.3 App header REBUILT (the big one):
+      - app_header.dart is now a ConsumerWidget rendering: avatar | "Hi, {name}" +
+        📍 city, country | [📅 Nd] [🕐 Nd] | 🔔 bell. Height 56 -> 76.
+      - The bell moved INTO the header and now shows on all 5 tabs (was Discover-only);
+        `headerActions` now means "extra actions before the bell".
+      - app_shell.dart + app_router.dart updated for the new API; removed the
+        duplicate Discover bell. Left a TODO: the old app has no header filter button
+        (the radius chip lives on the Discover body) — remove in Phase 2.
+      - DATA HONESTY (the plan's rule: hide, never fake):
+          * 🕐 subscription pill reads a NEW `Profile.premiumUntil` field (the
+            `premium_until` column existed in migration_001 but was never parsed).
+            Added `premiumDaysLeft` getter; the pill HIDES when null/expired.
+          * 📅 account-expiry pill: `accountDaysLeft` is hard-coded to null and
+            documented, because NO SUCH FIELD EXISTS anywhere in the delivered
+            schema. The pill therefore never renders today. Backend must add it.
+    1.4 Bottom nav:
+      - Discover icon compass -> sparkles; added an `activeIcon` per destination so
+        the selected tab shows a FILLED glyph (Lucide is outline-only, so the filled
+        states use Material icons — visually equivalent to the screenshots).
+      - Added the small pink dot under the active tab's label; height 64 -> 72.
+    1.5 Auth screen rebuilt to match WA0042/WA0047:
+      - Removed the surrounding Card (plain pink page), wordmark "LoveMe", tagline
+        "Find your perfect match", full-bleed square-ish Login/Sign Up segmented
+        control, bold labels ABOVE each field, "Min 6 characters" hint, gradient CTA,
+        pink bold "Forgot password?", and a "↻ Refresh" action (invalidates
+        authControllerProvider, which re-reads the session).
+      - REMOVED per 0.4: confirm-password, DOB, gender, country, Google sign-in, and
+        the 4-link legal footer. Sign-up is now email + password + one 18+ checkbox
+        with inline Terms/Privacy links (TapGestureRecognizers held as fields and
+        disposed, not created in build()).
+      - Validators.password min 8 -> 6, via a new AppConstants.minPasswordChars.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` -> No issues found (2 pre-existing false-positive
+      use_null_aware_elements info lints in chat_repository only).
+    - `flutter test` -> All tests passed (2).
+    - `flutter build apk --debug` -> SUCCESS.
+    - NOT viewed on a device this session — the header needs a signed-in user with a
+      profile row to show the avatar/name/location.
+  Known follow-ups created by this phase:
+    - The 📅 account-expiry pill can never render until backend adds the field.
+    - The ringtone ▶ preview button is intentionally disabled (no audio assets).
+    - Discover still has a header filter button; it must move to a body chip (Phase 2).
+    - "Remember me" checkbox still does nothing (supabase_flutter persists sessions
+      regardless) — decide in a later phase whether to wire or drop it.
+  Next: PHASE 2 — Discover (photo carousel, side thumbnail rail, chips, Report,
+    Approx badge, last-active pill, Show more, 4 solid FABs, swipe gestures, and the
+    search-radius sheet). Await user "go".
+
+[2026-07-10] UI PARITY — PHASE 2 (Discover, the hero screen)
+  Scope: rebuild features/discover/* to match old app screenshots WA0034/WA0050,
+  per UI_REBUILD_PLAN.md §Phase 2. Also added a repository method Phase 2 needed.
+  Changes:
+    - shared/data/profile_photo_repository.dart: added photosFor(userId) to
+      ProfilePhotoRepository (+ Supabase impl) — myPhotos() only ever fetched the
+      signed-in user's own gallery; Discover needed to read an arbitrary candidate's
+      profile_photos rows for the carousel. Public read under existing RLS.
+    - features/discover/discover_providers.dart: added worldwideSearchProvider
+      (StateProvider<bool>, defaults true), searchRadiusKmProvider (defaults 50),
+      kRadiusPresetsKm (5/10/25/50/100/250/500/1000/2500/5000), and
+      cardPhotosProvider (FutureProvider.family<List<ProfilePhoto>, String>) that
+      wraps photosFor() and swallows errors to an empty list (mock candidates have
+      no profile_photos rows at all, which must not crash the card).
+    - features/discover/discover_filters_sheet.dart: REWRITTEN. Was a generic
+      age/gender/online-only filter sheet; replaced with the old app's search-radius
+      sheet — Worldwide toggle, big "N km" readout, slider (5-5000), 9 preset chips,
+      "Apply worldwide"/"Apply" GradientButton CTA. The old DiscoverFilters
+      (age/gender/online/verified) class in discover_providers.dart is UNCHANGED and
+      still used by discoverFeedProvider — this phase only replaced the sheet UI +
+      added the new worldwide/radius state alongside it, since the old app doesn't
+      expose age/gender filtering from this sheet but our mock feed still needs some
+      filter to stay useful pre-backend-search.
+    - features/discover/discover_screen.dart: REWRITTEN.
+      - _aboveCard(): yellow "🌍 Worldwide ⌄" (or "{N} km ⌄") chip that opens the new
+        sheet; quota line ("50 profiles/month" free / "1000+ profiles/month" +
+        pink "👑 Gold Plan" chip when isPremiumProvider is true — plan name is a
+        placeholder pending Phase 0.2's real 5-tier data landing on the client in
+        Phase 4). Stale-location banner OMITTED — no real geolocator fix timestamp
+        exists yet, so per "hide, don't fake" nothing renders there.
+      - _card(): full rebuild.
+        - Photo carousel: reads cardPhotosProvider; falls back to the single
+          Profile.photoUrl when the user has no gallery rows (true for every mock
+          candidate and most real users pre-Phase-1-media-upload). Tap-to-advance +
+          side numbered thumbnail rail (pink ring on the active one) + segmented
+          top progress bars — all three only render when there's >1 photo.
+        - Marital-status dark pill (Profile.maritalStatus — hidden if null) and a
+          Report dark pill (always shown, wired to a toast — see gap below).
+        - Verified badge kept; last-active pill OMITTED (needs user_presence.last_seen,
+          nothing reads that table yet).
+        - Distance chip now shows both km AND mi (p.distanceKm * 0.621371).
+          "Approx" GPS-accuracy badge OMITTED — no accuracy field anywhere.
+        - Relationship-goal line ("Need a {goal} 💍") shown when set.
+        - Tag chips via the new AppChip: orientation (yellow), interestedIn (pink,
+          "Likes {x}"), first 3 hobbies (grey). "Show more" yellow pill opens a
+          bottom sheet listing all hobbies when there are >3, or bio is set.
+        - Bio text on the card face itself REMOVED per Phase 0 §0.4 #14 (bio now
+          only reachable via "Show more").
+      - Action row: 4 solid-fill circles in the old app's order — ⚪ X (pass),
+        🟡 star (super-like), 🟢 message (chat), 🩷 heart (like, big). Previously
+        heart and chat were in the opposite order with outlined (not solid) circles.
+      - Swipe gesture: GestureDetector + AnimatedContainer translate/rotate on
+        pan; releasing past a 110px threshold fires like/pass, otherwise springs
+        back to center (0ms transform while dragging, 220ms ease-out on release/
+        spring-back).
+    - core/router/app_router.dart: removed _headerActionsFor's Discover-only
+      filter HeaderAction (superseded by the new body chip, per the Phase-1 TODO
+      left for this) — the function now always returns an empty list. Dropped the
+      now-unused lucide_icons_flutter and discover_filters_sheet/app_header imports
+      this left behind.
+  Data gaps hit (flagged in-code, not faked):
+    - `reports` table still doesn't exist server-side (confirmed 404 earlier this
+      project) — the Report pill shows a "coming soon" toast, no request is sent.
+    - user_presence.last_seen is never read anywhere in the app yet — no
+      last-active pill.
+    - No GPS-accuracy field anywhere — no "Approx" badge.
+    - No real geolocator fix timestamp — no stale-location banner.
+    - Multi-photo carousel silently degrades to single-photo for every profile
+      without profile_photos rows (all mock candidates today).
+  Result / verification (ALL GREEN):
+    - `flutter analyze` -> No issues found (same 2 pre-existing false-positive
+      use_null_aware_elements info lints in chat_repository, unrelated to this work).
+    - `flutter test` -> All tests passed (2, unchanged).
+    - `flutter build apk --debug` -> SUCCESS.
+    - NOT run on a device/emulator this session — recommend a manual swipe-gesture
+      + photo-carousel walkthrough before calling Phase 2 fully verified.
+  UI_REBUILD_PLAN.md: Progress Tracker Phase 2 -> Done 2026-07-10, Phase 3 -> NEXT;
+  all Phase 2 checkboxes ticked.
+  Next: PHASE 3 — Profile · Likes · Explore (shared profile-preview modal first,
+    then Profile card restructure, Likes list view, Explore country grid). Await
+    user "go".
+
+[2026-07-10] UI PARITY — PHASE 3 (Profile · Likes · Explore)
+  Scope: restructure the three remaining tab screens + a new shared modal,
+  per UI_REBUILD_PLAN.md §Phase 3.
+  Changes:
+    - shared/widgets/profile_preview_modal.dart (NEW): the modal used by both
+      Likes and Explore when tapping a person — circular photo, Name/Age,
+      verified badge, location, relationship goal, hobby chips (AppChip),
+      Close / Message 💬 (GradientButton) buttons. Message pops the sheet and
+      pushes straight to RoutePaths.chatTo(userId).
+    - features/profile/profile_screen.dart: REWRITTEN.
+      - White rounded card (AppTheme.cardShadow) replacing the old pink
+        gradient banner: avatar (88px) + camera badge (unchanged upload
+        flow), Name/Age in dark text, location, "Location is on" pill,
+        "Premium Active · {N}d left" pill (only when p.isPremium — hidden
+        otherwise, no fabricated countdown), relationship-goal line, hobby
+        chips, and a pink pencil FAB (top-right) opening the existing
+        edit-name sheet.
+      - New "Manage Plan" card (AppGradients.managePlan, pink->orange) when
+        premium: crown icon, "Current Plan: Gold" (plan name is a
+        placeholder — the real 5-tier data isn't wired to the client until
+        Phase 4), "Expires {date}" from Profile.premiumUntil (omitted if
+        null), chevron -> subscription screen. Free users still see the old
+        "Upgrade to Premium" banner instead.
+      - Rows collapsed to exactly 3, in a card: Settings, My Safety Reports,
+        Log Out (red). REMOVED per Phase 0 §0.4: stats row (Views/Likes/
+        Matches), the 4-photo gallery GridView, "Premium (demo toggle)"
+        switch, bio block, and the separate Notifications/Devices/
+        Subscription rows (Notifications+Devices have no old-app entry point
+        here — Devices is still reachable from Settings; Subscription is now
+        reached via the Manage Plan card or the upgrade banner).
+      - Consequence: myPhotosProvider (repository layer) is currently unused
+        by any screen — left in place since Settings' verification flow
+        (Phase 4 §4.1) may want gallery access again; not deleted.
+    - features/likes/likes_screen.dart: REWRITTEN.
+      - REMOVED the "Matches" tab and its 2-column blurred-grid/Unlock gate
+        entirely (Phase 0 §0.4 #1/#2 — confirmed via UI_GAP_ANALYSIS.md that
+        the old app has no matches list UI at all; new matches presumably
+        surface via Messages once a conversation exists). The realtime
+        subscribeToNewMatches() listener is KEPT — it still pops the "It's a
+        Match!" dialog and routes into chat, just without a tab to land on.
+      - "Liked You" is now the whole screen: "People Who Like You" heading +
+        "Viewing all N likes" subtitle, a pink "👑 Gold Plan" pill banner
+        (shown only when isPremiumProvider is true — no more blur/paywall
+        gating the free tier from seeing likes, matching the old app), and a
+        plain vertical list (avatar/Name/location/age/chevron) replacing the
+        2-column ProfileTile grid. Tapping a row opens ProfilePreviewModal
+        instead of jumping straight to chat.
+      - matchesProvider / myMatchRowsProvider (repository layer, used by the
+        old unmatch/block bottom sheet) are now unused by any screen — left
+        in place for the Phase 4 §4.4 chat safety-modal ("Block X" cards),
+        which is the new intended home for unmatch/block per the plan.
+    - features/explore/explore_screen.dart: REWRITTEN.
+      - Replaced the horizontal flag-chip strip + inline 2-col grid with:
+        "Explore" title + "Discover people worldwide" subtitle + 🌐 "Browse
+        by Country" label, a "Search countries…" TextField, and a 3-column
+        grid of white country cards (flag, name, "{N} users").
+      - Country list is still MockData.countries (8 entries, real-looking
+        mock counts) — NOT expanded to a full alphabetical world-country
+        list. Reasoning: the plan's own fallback for missing counts is
+        showing 0/— placeholders; padding the grid with dozens of
+        zero-count countries the mock backend has no data for would be
+        exactly the "faked data" this whole track is trying to avoid, so the
+        smaller real-looking set was kept instead. Revisit once the
+        `get_country_counts` RPC ([BE-9]) exists and a real country/count
+        source is available.
+      - Tapping a country opens a new _CountryUsersSheet modal (flag + name +
+        "(N users)" header, ✕ close, user rows) instead of updating an
+        inline grid; tapping a user in that sheet now opens
+        ProfilePreviewModal instead of pushing straight to chat.
+  Result / verification (ALL GREEN):
+    - `flutter analyze` -> No issues found (same 2 pre-existing false-positive
+      use_null_aware_elements info lints in chat_repository, unrelated).
+    - `flutter test` -> All tests passed (2, unchanged).
+    - `flutter build apk --debug` -> SUCCESS.
+    - NOT run on a device/emulator this session — recommend a manual
+      walkthrough of Profile edit/avatar-change, the Likes list, and the
+      Explore country modal before calling Phase 3 fully verified.
+  UI_REBUILD_PLAN.md: Progress Tracker Phase 3 -> Done 2026-07-10, Phase 4 ->
+  NEXT; all Phase 3 checkboxes ticked.
+  Next: PHASE 4 — Settings · Subscription · Messages/Chat (card-sectioned
+    Settings, real 5-tier plans, Messages segmented-pill list, Chat composer
+    rebuild). Depends on Phase 0.2 (plans, already locked) and 0.5 (vibration,
+    already done). Await user "go".
+
+[2026-07-10] UI PARITY — PHASE 4 (Settings, Subscription, Messages/Chat)
+  Scope: the largest phase - card-sectioned Settings, real 5-tier plans, a
+  segmented-pill Messages list, and a rebuilt Chat composer/header/reactions,
+  per UI_REBUILD_PLAN.md Phase 4. Depended on Phase 0 0.2 (plans, locked)
+  and 0.5 (vibration, already restored) - both prerequisites were satisfied.
+  Changes:
+    - shared/models/subscription_plan.dart: REWRITTEN. Dropped the old
+      duration-based Monthly/Quarterly/Yearly placeholder entirely; added
+      badge (String?, e.g. "Gold"/"Crown") and profileLimit (int?, null =
+      unlimited) fields for the real 5-tier model locked in Phase 0 0.2.
+    - shared/data/mock_data.dart: MockData.plans replaced with the real 5
+      tiers - Basic+ $5/500/Silver, Gold $10/1000/Gold (marked popular),
+      Platinum $15/1500/Diamond, Premium Elite $20/2000/Crown, VIP Elite
+      $25/Unlimited/VIP. Free tier still NOT added - its profile limit
+      remains unconfirmed per Phase 0's own flag; not guessed.
+    - features/settings/settings_screen.dart: REWRITTEN into a stack of
+      white rounded cards (AppTheme.cardShadow): Subscription (plan summary
+      + disabled "Download Receipt (PDF)" GradientButton - PDF generation
+      isn't built server-side, so the button is disabled rather than faking
+      a download - plus a "Manage Subscription" link), Appearance (Dark
+      Mode + "Remember email after inactivity logout" - the latter is a new
+      local bool, no persistence yet, matches old-app copy only), Location
+      Settings (static "Location enabled" ListTile + Worldwide toggle - no
+      geolocator wiring, same static-for-now caveat as Phase 2), Push
+      Notifications (COLLAPSED 8 real toggles into 1 "Background Alerts"
+      per Phase 0 0.4 #13 - the switch now drives pushEnabled specifically;
+      the other 7 notification_preferences columns are left at their
+      current values, untouched, so they can be re-exposed later without a
+      migration), Call Ringtone (unchanged from the Group-A fix session,
+      moved into a card), Vibration (same), Verification (NEW expandable:
+      doc-type chips -> Step 1 upload -> Step 2 selfie, reuses
+      PhotoPickerService + the existing avatars bucket since no
+      verify-identity backend exists - ends on a plain "Submitted - under
+      review" state, no fake approval), Help & Support (NEW expandable: 5
+      FAQ Q&As, Contact Us email + "Chat on Google Chat" text, 5 safety
+      tips - all static copy, no backend), Delete Account row, Sign out
+      row, Legal card (Privacy/Terms/Refund/Child Safety, unchanged links).
+      REMOVED: the old flat Discovery section (age-range/distance/show-me
+      sliders with no persistence and no matching old-app screen) and the
+      old flat Privacy section (hide-distance/online-status/screenshot-
+      guard - same reasoning, no old-app equivalent found in screenshots).
+    - features/subscription/subscription_screen.dart: REWRITTEN. Header
+      swapped from a plain AppBar to SubPageHeader with a "Unlock Premium"
+      trailing label. Plan cards now show the tier badge as a colored pill
+      (AppColors.tierSilver/Gold/Diamond/Crown/Vip) next to the name, an
+      info button opening a bottom sheet with the profile-limit copy, and
+      price as a flat "$N/mo" (no more /period text mismatch from the old
+      duration model). The plan matching a new _currentPlanId = 'gold'
+      constant gets peach fill + green border + a floating green "CURRENT"
+      ribbon - this mirrors the same "Gold" placeholder assumption the
+      Profile screen's Manage Plan card already makes (Phase 3), since
+      there is still no real subscription-tier column read from profiles.
+      Added a green renewal banner ("You're Currently on this Gold Plan -
+      Renews monthly") shown only when isPremiumProvider is true. Replaced
+      the 4 payment buttons (Paystack/PayPal/Wise/Google Play) with a
+      single GradientButton "Pay with M-PESA / Airtel Money" (still a
+      mocked checkout - flips isPremiumProvider after a delay, unchanged
+      mock behavior) PLUS the Wise "Upload Order Receipt Screenshot" button
+      KEPT per the Phase 0 0.1 pen-mark ruling (not deleted) but wired to a
+      "coming soon" toast since verify-receipt-upload doesn't exist.
+      Removed the perks-hero card and the Likes/Views usage bars (no old-
+      app equivalent). Added a "Checkout Section/Billing" expander (static
+      billing-terms copy) and a "Made with Love By Randy" footer.
+    - core/utils/date_format.dart: added RelativeTime.dayLabel() (e.g.
+      "Friday, Jul 3, 2026") and RelativeTime.isSameDay() - both needed by
+      the Chat screen's new date separators.
+    - features/messages/messages_screen.dart: REWRITTEN. Replaced the
+      Material TabBar with the Phase-1 SegmentedTabs pill switcher, "Chats"
+      carrying a live count badge. Conversation rows are now elevated white
+      cards (AppTheme.cardShadow) with a long-press OR chevron-tap
+      expanding an inline Mute / Archive / Delete action strip + a close
+      button to collapse - replacing flutter_slidable's swipe-to-delete
+      (the package is no longer imported anywhere in the app; left in
+      pubspec.yaml as an unused dep rather than touching dependency
+      management mid-UI-phase). Mute/Archive show a "not available yet"
+      toast - conversations has no muted/archived column ([BE-11],
+      unchanged gap); Delete still works (client-side hide, unchanged
+      behavior). Calls-tab empty state rebuilt to the old app's copy: phone
+      emoji, "No calls yet", "Start a voice or video call from any chat".
+      Call/chat card visuals also moved onto the white-card style for
+      consistency with the rest of Phase 4.
+    - features/chat/chat_screen.dart: REWRITTEN.
+      - Header: replaced the Material AppBar with a custom pink-gradient
+        bar using the Phase-1 CircleIconButton for back/call/video/shield,
+        avatar with an online status dot, name + "Online now"/"Offline".
+      - Date separators: a grey pill (RelativeTime.dayLabel) inserted
+        before the first message of each new calendar day.
+      - Reactions: replaced long-press-only + a 6-emoji bottom sheet with a
+        "+" button on every bubble (left side for outgoing, right side for
+        incoming, matching the old app's edge placement) that toggles an
+        inline 20-emoji picker card anchored under that bubble. Existing
+        reaction-chip row (grouped emoji + count, tap-to-remove-your-own)
+        kept unchanged underneath.
+      - Composer: split the old single "attach" button into a dedicated
+        photo circle (_sendPhoto) and an attach circle now used for video
+        only (_attachVideo) - previously one sheet picked Photo-or-Video.
+        Text field gained a rounded pill shape with an inline emoji icon
+        (decorative only - no emoji keyboard/picker wired to it yet, that's
+        a separate FRONTEND_REMAINING item). Send/mic is now a pink
+        gradient circular FAB (AppGradients.cta) instead of a plain
+        IconButton.
+      - Safety: the shield icon in the header now opens a proper modal
+        (shield + partner name, "Block {name}" and "Report & Block" as
+        bordered cards) instead of the old plain two-item ListTile sheet.
+        Both actions still just pop the sheet - there's no real
+        block/report backend call wired here yet ([BE], unchanged from
+        before this phase).
+  Result / verification (ALL GREEN):
+    - flutter analyze -> No issues found (same 2 pre-existing false-
+      positive use_null_aware_elements info lints in chat_repository,
+      unrelated).
+    - flutter test -> All tests passed (2, unchanged).
+    - flutter build apk --debug -> SUCCESS.
+    - NOT run on a device/emulator this session - recommend a manual
+      walkthrough of Settings' Verification/Help expanders, the
+      Subscription plan-info sheet, Messages' inline action row, and
+      Chat's reaction picker + composer before calling Phase 4 fully
+      verified.
+  UI_REBUILD_PLAN.md: Progress Tracker Phase 4 -> Done 2026-07-10, Phase 5
+  -> NEXT; all Phase 4 checkboxes ticked.
+  Next: PHASE 5 - Legal, Modals, Cleanup, Polish. 5.1 (real legal copy) is
+    BLOCKED until the user supplies the text (Phase 0 0.3, still deferred)
+    - everything else in Phase 5 (remaining modals, Delete
+    Account/Devices/Notifications simplification, dead-code cleanup) can
+    proceed without it. Await user "go".
+
+[2026-07-10] UI PARITY - PHASE 5 (Legal, Modals, Cleanup, Polish) - FINAL PHASE
+  Scope: the closing phase of the UI_REBUILD_PLAN.md 5-phase effort. Asked
+  the user how to handle 5.1 (real legal copy, still blocked - no text
+  supplied) before touching it; user chose "skip 5.1, do everything else."
+  So 5.1 stays lorem-ipsum placeholder, explicitly flagged as the one
+  remaining Play Store launch blocker, and everything else in Phase 5 (5.2
+  through 5.5) was completed.
+  Changes:
+    - shared/widgets/info_modals.dart (NEW) - the 4 remaining old-app
+      modals: locationPermission() ("Find people nearby" - pin icon, Enable
+      Now / Not now), getVerified() ("Get Verified" promo - shield icon,
+      Verify Now / Maybe Later, routes to Settings), accountExpiry() (calendar
+      icon, 90-day resignup copy - explains the header's 36d pill, which
+      still never renders since no backing field exists), subscriptionExpiry()
+      (clock icon, exact datetime from the real premium_until field, Got it
+      / Close). Shared _ExpiryDialog widget backs the last two.
+    - shared/widgets/app_shell.dart: converted AppShell from StatelessWidget
+      to ConsumerWidget so it could read currentUserProvider; wired
+      AppHeader's onAccountPillTap -> InfoModals.accountExpiry (the pill
+      itself still never shows, but the explainer is ready for when backend
+      adds the field) and onSubscriptionPillTap -> InfoModals.
+      subscriptionExpiry (only fires when profiles.premium_until is set,
+      matching the pill's own visibility rule - no dialog with fabricated
+      data).
+    - features/settings/settings_screen.dart: the Verification card's "Not
+      verified" label is now tappable -> InfoModals.getVerified (old app's
+      promo entry point).
+    - features/discover/discover_screen.dart: added a small map-pin icon
+      next to the worldwide/radius chip -> InfoModals.locationPermission
+      (old app's "Find people nearby" entry point; no real geolocator
+      permission request wired yet, this is UI-only per the existing Phase 2
+      location caveats).
+    - features/delete_account/delete_account_screen.dart: REWRITTEN per
+      Phase 0 0.4 #11. White SubPageHeader, single "Danger Zone" card with
+      the 5-bullet consequence list + solid red "Delete My Account" button.
+      REMOVED entirely: password field, type-DELETE confirmation field,
+      reason dropdown - none exist in the old app. A plain AlertDialog
+      ("Delete your account? ... Cancel / Delete") is the only remaining
+      confirmation gate.
+    - features/devices/devices_screen.dart: REWRITTEN per 0.4. Title "Active
+      devices", SubPageHeader, white cards instead of Card, "Last active …
+      · Signed in N days ago" per row (DeviceSession has no separate sign-in
+      timestamp, so both phrases read off lastActive - the closest honest
+      value rather than inventing a second field), solid red "Sign out of
+      other devices" GradientButton (flat red gradient) replacing the old
+      OutlinedButton, and the per-device inline "Sign out" text link
+      dropped (old app has no such link).
+    - features/notifications/notifications_screen.dart: REWRITTEN per 0.4.
+      SubPageHeader "Notifications", absolute dates (RelativeTime.absolute(),
+      new helper - "6/19/2026" instead of relative "2d") replacing relative
+      time, pale-pink circular icon backgrounds. REMOVED: unread dots,
+      "Mark all read" button, swipe-to-delete (Dismissible) - rows are now
+      plain read-only ListTiles that still mark-as-read + deep-link on tap.
+    - core/utils/date_format.dart: added RelativeTime.dayLabel() /
+      isSameDay() (used by Chat's date separators, Phase 4) and
+      RelativeTime.absolute() (used by the Notifications rewrite above).
+    - Dead code removed:
+      - features/admin/ (whole directory) + its GoRoute + RoutePaths.admin +
+        isAdminProvider - deleted per Phase 0.4 #6. The Admin screen already
+        had no remaining nav entry point since Phase 3 dropped its Profile
+        row; this was the last reference (the route itself).
+      - shared/widgets/placeholder_screen.dart - deleted; grep confirmed it
+        was referenced only in a stale doc-comment, no route imported it.
+      - AppConstants.maxGalleryPhotos - deleted; grep confirmed zero
+        remaining references after Phase 3 removed the Profile gallery grid
+        (the real DB cap of 4 lives in profile_screen.dart's local
+        _maxProfilePhotos constant, unchanged).
+      - MockData.premiumPerks - deleted; the Subscription rewrite in Phase 4
+        already dropped the perks-hero card that was its only consumer.
+      - MockProfileRepository: KEPT (per the plan's "or keep as a
+        documented test seam" option) - already unused-but-documented, no
+        change needed.
+    - Dark-mode audit + fix (the actual substance of 5.5's "verify dark
+      mode still looks right" item): grepped every Phase 1-4 screen for
+      AppColors.bgLight / cardLight / fgLight and found them hardcoded
+      (not theme-aware) across 11 files - every rebuilt screen's Scaffold
+      background and white cards would have stayed light-pink/white even
+      with Dark Mode toggled on, which is a real regression introduced by
+      the last four phases' redesign. Fixed all of them to read from
+      Theme.of(context) instead:
+        auth_screen.dart, explore_screen.dart, delete_account_screen.dart,
+        devices_screen.dart, chat_screen.dart (4 spots, incl. threading
+        BuildContext into _safetyCard/_tile), subscription_screen.dart,
+        notifications_screen.dart, likes_screen.dart, settings_screen.dart
+        (fixed once via the shared _cardDecoration getter), profile_screen.
+        dart (2 spots), messages_screen.dart (2 spots).
+      Also fixed 3 secondary hardcodes that would read badly in dark mode:
+      chat_screen.dart's date-separator pill and two composer circle
+      buttons (AppColors.mutedLight -> theme.colorScheme.secondary), and
+      notifications_screen.dart's icon-circle background (same fix).
+      Deliberately LEFT alone: AppColors.mutedFg (a mid-grey that reads
+      acceptably on both light and dark surfaces, unlike a full card fill -
+      a true fix would need to thread mutedFgDark through everywhere, out
+      of scope for a "final polish" pass) and the brand-color accent
+      circles in info_modals.dart / AppChip's yellow/pink tones (intentional
+      brand colours, not surface fills - matches how Discover's card chips
+      already work unconditionally since Phase 2).
+    - Emoji-consistency pass: reviewed Phase 2-4 output; emoji density
+      already matches the old app's tone throughout (Discover chips,
+      Profile pills, Settings section icons, Subscription tier badges, Chat
+      reactions) - no further changes needed here.
+  Result / verification (ALL GREEN):
+    - flutter analyze -> No issues found (same 2 pre-existing false-
+      positive use_null_aware_elements info lints in chat_repository,
+      unrelated, present since before this project phase work started).
+    - flutter test -> All tests passed (2, unchanged).
+    - flutter build apk --debug -> SUCCESS.
+    - NOT run on a device/emulator this session - recommend a manual
+      light/dark mode toggle walkthrough given how many files the dark-mode
+      fix touched, plus exercising all 4 new modals, before calling this
+      fully verified.
+  UI_REBUILD_PLAN.md: Progress Tracker Phase 5 -> "Done except 5.1 (blocked)".
+  All Phase 5.2-5.5 checkboxes ticked; 5.1's checkboxes intentionally left
+  unchecked with the blocker reason inline.
+
+  === UI_REBUILD_PLAN.md IS NOW COMPLETE (Phases 0-5, minus the deferred
+  legal-copy item) ===. The 5-phase UI-parity effort that started
+  2026-07-10 is done. Remaining work before a real launch:
+    1. Real legal copy (Phase 0 0.3 / Phase 5.1) - user must supply Terms /
+       Privacy / Refund / Child Safety text, including the Google Play CSAE
+       statement. This is the only front-end launch blocker left.
+    2. Everything already tracked in BACKEND_REMAINING.md (reports table,
+       user_presence reads, geolocator, get_country_counts RPC, storage
+       buckets already flagged in BACKEND_MEDIA_REQUIREMENTS.md, etc.) -
+       unchanged by this UI track, still needs the backend track.
+    3. A live on-device walkthrough of the whole app - this entire 5-phase
+       effort was verified via flutter analyze / test / build only, never
+       flutter run on an emulator or device.
+
+[2026-07-10] MEDIA / MATCHING BACKEND WENT LIVE - client reconciliation
+  Trigger: backend team's deploy memo confirmed migrations 009-019 are now
+  live & verified on the real project (tamlbnmihdcjiptbezjm), including the 5
+  storage buckets + RLS, and the SECURITY DEFINER triggers create_match_on_
+  mutual_like (014) + create_conversation_on_match (011) - all things the
+  client had been coding around as "not built yet." Reconciled the client to
+  the new reality.
+  Key insight: the actual functional upload + match/conversation code was
+  ALREADY correct (real uploadBinary, real repositories, realtime subs) - it
+  only ever failed because the server-side infra didn't exist. So most of this
+  pass was removing stale defensive scaffolding + comments, plus two real
+  functional changes (below).
+  Changes:
+    - shared/data/swipe_repository.dart, match_repository.dart,
+      conversation_repository.dart, chat_repository.dart: rewrote the class/
+      method doc comments that claimed the mutual-like trigger / conversation
+      auto-create trigger / storage buckets "haven't shipped yet." They have.
+      conversation_repository's forPartner()==null is now documented as
+      transient (match row not yet propagated) rather than the expected steady
+      state.
+    - features/chat/chat_screen.dart: the null-conversation branch was a
+      permanent dead-end EmptyView ("Chat isn't available for this match yet").
+      Since every active match now auto-gets a conversation, changed it to a
+      transient "Setting up your chat…" with a Retry button that invalidates
+      conversationForPartnerProvider.
+    - features/discover/discover_screen.dart: updated the _like() comment - a
+      mutual like now really does create the match+conversation server-side;
+      clarified that Discover intentionally doesn't pop its own "It's a Match!"
+      (the Likes realtime subscription owns that dialog, to avoid a double
+      popup).
+    - CHAT MEDIA NOW STORES OBJECT PATHS, NOT SIGNED URLS (user-approved,
+      deploy memo open Q1 option a - fixes "chat media 403s after 7 days"):
+      - chat_repository.dart: UploadedChatMedia.mediaUrl/thumbnailUrl renamed
+        to mediaPath/thumbnailPath. _uploadPrivate() now returns the bare
+        object path (<conversationId>/<uuid>.<ext>) instead of a 7-day signed
+        URL. Added signedUrlFor(path, type, {thumbnail}) which mints a fresh
+        1-HOUR signed URL on demand, picks the right private bucket from the
+        message type, and passes through any legacy full http(s) value
+        unchanged (back-compat for any rows already holding a URL). The stored
+        message.media_url/thumbnail_url columns now hold paths.
+      - chat_screen.dart: the 3 media send sites (_sendPhoto/_attachVideo/
+        _toggleVoice) pass up.mediaPath/up.thumbnailPath. Media rendering
+        (_messageBody) now resolves the path -> signed URL via a new
+        _MediaThumb StatefulWidget (FutureBuilder over signedUrlFor, resolved
+        once & cached for the widget's life), replacing the old _mediaThumb
+        that fed a raw stored URL straight into CachedNetworkImage.
+  NOT changed (already correct, verified): the profile-photo upload path
+    (profile_photo_repository.uploadPhoto already does a real avatars-bucket
+    upload + getPublicUrl; the picsum URL is only in MockData's mock candidate
+    deck, never the real write path), all the realtime subscriptions, the
+    match/unmatch/block repository methods.
+  Docs updated: BACKEND_REMAINING.md [BE-8] (buckets) -> mostly resolved,
+    [BE-9] (match trigger) -> resolved, [BE-11] (conversation auto-create) ->
+    resolved; CLAUDE.md Current state gained a "media/matching backend went
+    live" entry.
+  Still the one media launch blocker: moderate-image (server NSFW/human gate)
+    is NOT built - uploads aren't scanned server-side ([BE-5]). Also still
+    open per the memo: last_message_id/at not trigger-populated (client queries
+    messages directly - works), wise-proofs bucket (P3), generate-pdf-thumbnail
+    (P3).
+  Result / verification (ALL GREEN):
+    - flutter analyze -> No issues found (same 2 pre-existing false-positive
+      use_null_aware_elements lints in chat_repository, unrelated - just at
+      shifted line numbers now).
+    - flutter test -> All tests passed (2, unchanged).
+    - flutter build apk --debug -> SUCCESS.
+    - NOT run on-device - the whole point of these changes is to work against
+      the now-live backend, so the meaningful test is a real flutter run with
+      a signed-in account: mutual-like -> match dialog -> land in a working
+      chat, send a photo/video/voice note, and confirm it still renders after
+      a while (signed URL re-minted on each open).
+
+[2026-07-10] FIX: Discover feed now shows REAL profiles from the DB
+  Bug (user-reported): the home/Discover screen only showed the 5 fake
+  frontend mock profiles, never real users from the database.
+  Root cause: SupabaseProfileRepository.discoverFeed() was the last remaining
+  mock hold-out - it returned MockData.profiles (minus already-swiped ids)
+  instead of querying the live `profiles` table. Every other profile path
+  (me/byId/likedYou/matches) had already been moved to the real tables; this
+  one was left on mock because "server-side discovery/ranking isn't built."
+  But a plain query is strictly better than mock data, so wired it up.
+  Change - lib/shared/data/repositories.dart discoverFeed():
+    - Now queries `profiles`: .neq('user_id', myId) (exclude self)
+      .eq('profile_complete', true) (only finished profiles - both columns
+      confirmed to exist per migration_001.md) .order('created_at', desc)
+      .limit(100), then excludes already-swiped users client-side via the
+      live likes/passes tables (getSwipedUserIds, unchanged).
+    - Still no server-side geo ranking / per-plan daily cap / distance - that
+      needs the discovery RPC ([BE-9]), unbuilt. This is a plain "newest
+      complete profiles first" list; the existing DiscoverFilters
+      (age/gender/online/verified) still apply on top via
+      discoverFeedProvider.
+  Verified real profiles won't be wrongly filtered out by the default
+    DiscoverFilters: distance passes when null (real profiles have no
+    distanceKm yet), gender defaults to all, online/verified default off, age
+    range 18-60. (Caveat, pre-existing & not changed: a real user aged 61+
+    would be hidden by the default maxAge=60 until the user widens it.)
+  Updated the now-stale "mock" doc comments on SupabaseProfileRepository and
+    discoverFeedProvider. byCountry() (Explore) is now the ONLY remaining mock
+    profile path - it needs the get_country_counts RPC ([BE-9]).
+  Result: flutter analyze clean (same 2 pre-existing lints), flutter test
+    green (2). NOT run on-device - needs a signed-in account + other real
+    complete profiles in the DB to see the effect.
+
+[2026-07-10] FIX: sent chat messages could vanish from the screen (realtime-only bug)
+  Bug (user-reported, with screenshot): sent a text message in Chat and it
+  never appeared in the message list - screen stayed on the "Say hi" empty
+  state even after sending.
+  Root cause: _send() (and the 3 media senders: _sendPhoto/_attachVideo/
+  _toggleVoice) called the repository's send method, threw away the returned
+  ChatMessage row, and relied ENTIRELY on the Supabase Realtime
+  postgres_changes subscription to append the message to the local list. If
+  the realtime channel hadn't finished (re)connecting yet, or dropped a beat
+  on a flaky mobile connection, the message was genuinely saved to the DB but
+  never rendered - the sender's own message could silently disappear.
+  Fix - lib/features/chat/chat_screen.dart:
+    - Added _appendSent(ChatMessage) - appends to _messages + scrolls to
+      bottom, but only if the id isn't already present (guards against
+      double-add if realtime ALSO delivers the same insert).
+    - _send(), _sendPhoto(), _attachVideo(), _toggleVoice() now all capture
+      the ChatMessage returned by sendTextMessage()/sendMediaMessage() and
+      call _appendSent() on it immediately, instead of discarding the return
+      value and waiting on realtime alone. Realtime is now purely an
+      ADDITIONAL path for receiving the OTHER participant's messages (and a
+      backup for your own) rather than the only path.
+  Result: flutter analyze clean (same 2 pre-existing lints), flutter test
+    green (2). NOT run on-device.
+
+[2026-07-10] FIX: signing out and into a different account showed the old account's data
+  Bug (user-reported): sign out, sign in as a different user -> the app kept
+  showing (some of) the previous account's profile/feed/matches/etc. instead
+  of the new user's.
+  Root cause: NONE of the ~19 user-scoped FutureProviders in
+  shared/data/repositories.dart (currentUserProvider, discoverFeedProvider,
+  likedYouProvider, matchesProvider, conversationsProvider, messagesProvider,
+  notificationsProvider, myPhotosProvider, myStatsProvider, etc.) depend on
+  authControllerProvider's state - they only call Supabase.instance.client
+  directly via their repository. Riverpod caches a FutureProvider's result
+  until something explicitly invalidates it or a watched dependency changes;
+  since none of these watch auth state, Riverpod had no reason to ever
+  recompute them across a sign-out/sign-in. AuthController.signOut() reset
+  its OWN state but never touched any of these, so any provider that had
+  already resolved kept serving the previous user's cached data after a new
+  user signed in.
+  Fix - lib/features/auth/auth_controller.dart:
+    - Added _invalidateUserScopedProviders(), which explicitly
+      ref.invalidate()s every user-scoped provider: currentUserProvider,
+      discoverFeedProvider, cardPhotosProvider (import from
+      features/discover/discover_providers.dart), likedYouProvider,
+      matchesProvider, myMatchRowsProvider, conversationsProvider,
+      conversationForPartnerProvider, messagesProvider, profileByIdProvider,
+      notificationsProvider, notificationPreferencesProvider,
+      safetyReportsProvider, devicesProvider, profilesByCountryProvider,
+      myPhotosProvider, myStatsProvider, reactionsProvider,
+      callHistoryProvider, isPremiumProvider.
+    - Called from signOut() (the main fix - guarantees a clean slate the
+      moment a session ends) AND from signIn()/signUp() (belt-and-suspenders,
+      in case any provider resolved again during the brief signed-out window
+      between accounts, e.g. from a screen still mounted during the auth
+      transition).
+  Chose explicit invalidation over making each provider ref.watch(auth
+  state) - would require touching ~19 provider definitions across multiple
+  files and is easy to miss for whoever adds the 20th provider later; a
+  single method in the one place that legitimately knows "identity just
+  changed" is more maintainable, at the cost of needing to remember to add
+  new user-scoped providers to this list too (flagged in the method's doc
+  comment).
+  Result: flutter analyze clean (same 2 pre-existing lints, unrelated).
+    flutter test green (2, unchanged). NOT run on-device - needs two real
+    accounts to verify the switch is actually clean end-to-end.
+
+[2026-07-10] RESPONSIVENESS: fixed the 4 real overflow risks found by audit
+  Context: user asked for a responsiveness pass with an explicit constraint -
+  the app must look EXACTLY the same as today; no tablet/desktop redesign, no
+  new breakpoints. Clarified via AskUserQuestion that "responsive" here means
+  "don't overflow/clip/squish on any phone size" while keeping the existing
+  448px-capped, centered phone layout untouched (already correct, confirmed
+  by audit - AppShell/AuthScreen apply maxContainerWidth consistently and
+  nothing bypasses it with a larger fixed width).
+  Ran an Explore-agent audit across the whole lib/ tree first (not a fix
+  pass) to find genuine risk points rather than guessing. Verdict: the
+  codebase is mostly already responsive (chat bubbles use screenWidth*0.68,
+  most grids use AspectRatio, most text Rows already use Expanded/Flexible/
+  ellipsis). Only 4 real overflow risks found on narrow phones (~320px, e.g.
+  iPhone SE) - everything else was low/cosmetic (wraps to 2 lines instead of
+  overflowing).
+  Fixes - all pure overflow guards, zero visual change at normal widths
+  (nothing that already fit was touched):
+    - features/discover/discover_screen.dart: card's name+age Text (large
+      headlineMedium, next to an online-status dot) had no Flexible/
+      ellipsis - wrapped in Flexible + maxLines:1 + TextOverflow.ellipsis.
+      Highest real-overflow risk of the four (headline-size font in a fixed-
+      width card).
+    - shared/widgets/profile_preview_modal.dart: same pattern for the name+
+      age Text next to the verified badge in the Likes/Explore preview
+      sheet - wrapped in Flexible + ellipsis. Confirmed the outer
+      mainAxisSize.min Column still gives the Row a finite width from the
+      modal sheet, so Flexible has something real to shrink into.
+    - shared/widgets/sub_page_header.dart: the shared SubPageHeader title
+      was already in Expanded but had no maxLines/overflow - added
+      maxLines:1 + ellipsis so a caller with wide `actions` (see next) can't
+      push it into an unbounded-width crash.
+    - features/subscription/subscription_screen.dart: the header's
+      `actions` Row ("crown icon + Unlock Premium" label) had no
+      mainAxisSize.min/Flexible - on a narrow screen this fixed-width label
+      would squeeze "Choose Your Plan" down to almost nothing before the new
+      ellipsis even kicks in. Added mainAxisSize.min to the Row + wrapped
+      the label Text in Flexible + ellipsis so both sides degrade gracefully
+      together instead of one winning by being rigid.
+    - features/chat/chat_screen.dart _MediaThumb: image/video thumbnails
+      were a hardcoded 200x200, which can slightly exceed the chat bubble's
+      own inner width (screenWidth*0.68 minus the bubble's 14px*2 padding)
+      on the narrowest phones. Now computed as
+      (screenWidth*0.68 - 28).clamp(120, 200) - renders at the same 200px as
+      before on any normal/large phone (the clamp's upper bound), only
+      shrinks below that on genuinely narrow screens.
+  Result: flutter analyze clean (same 2 pre-existing lints in
+    chat_repository, unrelated). flutter test green (2, unchanged).
+    flutter build apk --debug -> SUCCESS. NOT run on-device / no simulator
+    width sweep performed - recommend testing at ~320px width (e.g. iPhone
+    SE size in a resizable emulator, or Flutter web + browser resize) to
+    visually confirm the 4 fixed spots no longer clip and everything else
+    still looks pixel-identical to before.
+
+[2026-07-10] FIX: 3 layout bugs reported with screenshots (Profile, Messages, Discover)
+  Bug 1 - Profile card content not centered:
+    features/profile/profile_screen.dart _profileCard(): the avatar/name/
+    chips Column had no width to center against - Column sizes to its
+    widest child by default, so CrossAxisAlignment.center was centering
+    the content against ITSELF (effectively a no-op) rather than against
+    the actual white card width, since the pencil FAB's Positioned sibling
+    doesn't contribute to the Stack's sizing either. Fixed by adding
+    `const SizedBox(width: double.infinity)` as the Column's first child -
+    forces the Column to claim the Stack's full available width, so
+    CrossAxisAlignment.center now genuinely centers against the card.
+  Bug 2 - Messages chat row "BOTTOM OVERFLOWED BY 8.0 PX" (screenshotted):
+    features/messages/messages_screen.dart _ChatRow: ListTile.trailing held
+    a Column (time label + chevron IconButton) taller than the space
+    ListTile allocates for trailing. Root cause: even with padding:zero and
+    an empty BoxConstraints, IconButton still carries built-in minimum
+    tap-target overhead - not actually removable via IconButton's own
+    params in this Flutter version. Fixed by replacing the IconButton with
+    a bare Icon + GestureDetector (no min-size inflation at all) and adding
+    `minVerticalPadding: 12` to the ListTile for breathing room. Also added
+    `mainAxisSize: MainAxisSize.min` to the trailing Column defensively.
+  Bug 3 - Discover "Worldwide" chip/location pin misaligned under the header:
+    features/discover/discover_screen.dart build(): the EMPTY-STATE branch
+    (`remaining.isEmpty`, which is what the screenshot was actually showing
+    - "No matches near you") built its ListView with NO padding at all,
+    while the normal data branch used `EdgeInsets.fromLTRB(16,16,16,24)`.
+    So _aboveCard()'s chip/pin sat flush against the screen edges only in
+    the empty state, looking misaligned vs. every other screen's consistent
+    16px margin. Fixed by giving the empty-state ListView the identical
+    padding as the data branch.
+  Result: flutter analyze clean (same 2 pre-existing lints, unrelated).
+    flutter test green (2, unchanged). flutter build apk --debug -> SUCCESS.
+    NOT run on-device - user should re-check all 3 screenshotted screens.
+
+[2026-07-10] BUILT: Real GPS, real Settings toggles, Chat extras (emoji + edit/delete)
+  Scope: user picked 3 items off FRONTEND_REMAINING.md's gap list to close in
+  one pass - real onboarding GPS, the 2 remaining decorative Settings
+  switches, and the chat composer emoji picker + message edit/delete (both
+  previously flagged as no-op / repo-methods-with-no-UI).
+  Confirmed via AskUserQuestion before adding a new native dependency
+  (geolocator touches AndroidManifest.xml + a runtime permission prompt,
+  unlike the other two Dart-only asks) - user said yes, proceed.
+
+  1) REAL GPS (previously: 900ms fake delay hardcoding Nairobi/Kenya):
+    - pubspec.yaml: added geolocator ^13.0.2. Did NOT add permission_handler
+      - geolocator has its own requestPermission()/checkPermission() API,
+      so a second permission package would be redundant surface area.
+    - android/app/src/main/AndroidManifest.xml: added
+      ACCESS_FINE_LOCATION + ACCESS_COARSE_LOCATION. Commented as a
+      one-shot foreground fix, not background tracking (no background
+      location permission requested).
+    - shared/models/profile.dart: added locationLat/locationLng/
+      locationAccuracyM fields (nullable doubles) - the live profiles table
+      already has location_lat/location_lng/location_accuracy_m columns
+      (migration_001.md) that nothing in the client read or wrote before.
+      Wired through fromJson/toInsertJson/copyWith.
+    - core/location/location_service.dart (NEW): LocationService.
+      getCurrentLocation() - checks service-enabled, requests permission if
+      needed, takes ONE GPS fix (LocationAccuracy.high, 20s timeout).
+      Typed exceptions: LocationServiceDisabledException,
+      LocationPermissionDeniedException (permanently: bool for the
+      deniedForever case). Riverpod provider: locationServiceProvider.
+    - features/onboarding/profile_setup_screen.dart: _useLocation()
+      rewritten to call the real service instead of faking a delay + Nairobi
+      default. Deliberately does NOT fake a city/country from coordinates
+      (no reverse-geocoding service exists) - only stores the real lat/lng/
+      accuracy; country/city stay the existing manual dropdown/text field,
+      per the project's "never fake data" rule. On finish, the 3 location
+      columns are included in the profiles PATCH only if a fix was captured.
+
+  2) SETTINGS - the last 2 decorative switches (Dark Mode, Notifications,
+     Ringtone, Vibration were already real per FRONTEND_REMAINING.md):
+    - "Remember email after inactivity logout": was local setState-only, a
+      SEPARATE unused field from the Auth screen's own decorative
+      "Remember me" checkbox - two flags for what should be one feature.
+      Consolidated into core/settings/local_settings_controller.dart's
+      LocalSettings (the existing device-local-preferences pattern used for
+      ringtone/vibrate): added rememberEmail (bool) + rememberedEmail
+      (String?, cleared when the toggle turns off) +
+      setRememberEmail()/rememberEmailIfEnabled(). features/auth/
+      auth_screen.dart: the Login tab's "Remember me" checkbox now reads/
+      writes this same real setting (removed the old dead _rememberMe
+      field); pre-fills the email field from rememberedEmail on screen
+      build (once, via a _prefilledEmail guard so it doesn't fight manual
+      edits); calls rememberEmailIfEnabled(email) after a successful
+      sign-in (not sign-up - only remember a credential that's proven to
+      work).
+    - "Worldwide" Discovery toggle: was local setState-only. Real fix
+      reuses the EXISTING live profiles.distance_preference_km column
+      (Discover's own radius filter already reads this) instead of adding
+      a new boolean column/local flag: added
+      AppConstants.kWorldwideDistanceKm = 20000 as a sentinel (bigger than
+      Discover's own 5000km max preset, unambiguous). Settings screen now
+      reads currentUserProvider to show the real state and PATCHes via a
+      new updateMyProfile(distancePreferenceKm:) parameter (added to
+      ProfileRepository interface + both Supabase/Mock implementations).
+
+  3) CHAT EXTRAS:
+    - Emoji picker (was: bare decorative Icon, no onPressed): composer's
+      smile suffixIcon is now a real IconButton -> _openEmojiPicker() opens
+      a 48-emoji grid bottom sheet (_kComposerEmojis, a broader everyday set
+      than the existing 20-emoji _kReactionEmojis list, which stays
+      reaction-focused and untouched); tapping an emoji inserts it at the
+      TextField's current cursor/selection position via
+      TextEditingValue(selection:) rather than just appending to the end.
+    - Edit/Delete message (was: ChatRepository.editMessage()/
+      deleteMessage() existed, zero UI called them): long-press on a text
+      bubble you sent (mine && messageType == text - editing a photo/video/
+      voice message doesn't make sense) opens an action sheet -> Edit opens
+      an AlertDialog pre-filled with the current text, saves via
+      editMessage() and patches the message in the local _messages list in
+      place (marks isEdited: true, sets editedAt) so the "edited" label
+      shows immediately without a re-fetch; Delete confirms via AlertDialog
+      then calls deleteMessage() (soft-delete server-side, per the model's
+      existing isDeleted field) and removes the message from the local list
+      (the repo's getMessages() already filters is_deleted=false, so it
+      just wouldn't reappear on a real refetch either way).
+    - Bubble UI: added an "edited" italic label next to the timestamp when
+      m.isEdited is true.
+
+  Result / verification:
+    - flutter analyze -> No issues found beyond 4 pre-existing-style info
+      lints (use_null_aware_elements - 2 in chat_repository.dart unchanged
+      from before, 2 new but same style in repositories.dart's
+      updateMyProfile - all cosmetic, non-blocking, matches the project's
+      existing accepted pattern).
+    - flutter test -> All tests passed (2, unchanged).
+    - flutter build apk --debug -> FAILED, twice, even after `flutter clean`
+      + `pub get` + rebuild (user approved the clean). Error:
+      "Cannot access output property ... of task
+      ':app:compileDebugKotlin' ... Could not read directory path
+      '...\build\app\kotlin\compileDebugKotlin\cacheable\caches-jvm\jvm\
+      kotlin'." This reproduced identically after a full clean, so it's a
+      Gradle/Kotlin-incremental-compile environment issue on this Windows
+      machine (stale daemon, file lock, or AV interaction with the build
+      dir) - NOT caused by any code in this pass. Flagging explicitly
+      rather than claiming a green build I didn't get. Recommend: kill any
+      stray Gradle daemons (`gradlew --stop` from android/), or a full
+      machine restart, then retry `flutter build apk --debug`.
+  NOT run on-device for any of the 3 features (needs a physical GPS fix,
+    live Supabase writes, and manual testing of the emoji picker/edit-
+    delete flow) - recommend testing all three before considering this done.
+
+[2026-07-10] FIX: debug APK black-screens on launch (2 root causes, both fixed)
+  User reported the debug APK opens to a solid black screen instead of the
+  app. Investigated and found TWO separate problems - fixed both.
+  Root cause 1 (the actual black screen): every `flutter build apk --debug`
+    run this session (and, it turns out, historically) was built WITHOUT
+    --dart-define=SUPABASE_URL / --dart-define=SUPABASE_ANON_KEY.
+    core/config/supabase_config.dart reads these via
+    String.fromEnvironment(...), which is '' when not passed at build time.
+    bootstrap.dart's assert() catches this in debug builds - but an assert
+    thrown before runApp() in an installed APK crashes before the Flutter
+    widget tree (and its red error overlay) ever renders, which is
+    indistinguishable from a black screen to the user. .vscode/launch.json
+    already had the correct --dart-define values for `flutter run` from the
+    IDE - `flutter build apk` was just never given them. FIX: rebuilt with
+    both --dart-define flags matching launch.json's known-good values.
+  Root cause 2 (build kept failing before I could even test the fix): the
+    Gradle "Cannot access output property ... Could not read directory path
+    ...\build\app\kotlin\compileDebugKotlin\cacheable\caches-jvm\jvm\kotlin"
+    error from the previous session's log entry was STILL happening, even
+    after a `flutter clean` + rebuild. Root-caused this session by actually
+    checking running processes (Get-Process) instead of re-trying blindly:
+    found 4 stray java.exe Gradle daemon processes (under
+    C:\Users\acer\.jdk\jdk-21.0.8(1)\, cmdline referencing
+    .gradle\caches\...) left over from earlier interrupted build attempts,
+    holding an open file lock on that exact build-cache directory - that's
+    what Gradle's error was actually complaining about. `gradlew --stop`
+    hadn't caught them (probably a version/project mismatch in daemon
+    registry). Killed the 4 stray PIDs directly (Stop-Process -Force,
+    confirmed via AskUserQuestion first since it's a process-termination
+    action), then the previously-undeletable build\ directory (which
+    wouldn't rm -rf even after killing them, presumably a teardown race) was
+    renamed out of the way (Rename-Item, not deleted, kept as
+    build_stale_<timestamp> - preferred the reversible move over a delete
+    per the safety principle) so Gradle could create a fresh one. Also added
+    `kotlin.incremental=false` to android/gradle.properties (approved via
+    AskUserQuestion) as a standing safety net against this class of Windows
+    Kotlin-incremental-cache corruption recurring - slightly slower Kotlin
+    compiles, worth it given this cost 2 sessions of build failures.
+  Result: `flutter build apk --debug` with both --dart-define flags -> BUILD
+    SUCCEEDED (154.9s). build\app\outputs\flutter-apk\app-debug.apk exists,
+    ~192MB, freshly timestamped. The renamed build_stale_<timestamp>
+    directory could not be deleted afterward (still locked by something,
+    not investigated further since it's inert and doesn't affect the app or
+    future builds) - safe to ignore or manually delete later.
+  IMPORTANT PROCESS NOTE for future sessions: `flutter build apk` (release
+    OR debug) for THIS project must always include both --dart-define flags
+    (SUPABASE_URL + SUPABASE_ANON_KEY, values in .vscode/launch.json) or the
+    resulting APK will crash to a black screen on launch. Plain
+    `flutter build apk --debug` with no flags (what every prior session in
+    this log used) produces a build that ANALYZES/passes gradle but is
+    non-functional when actually installed - the analyze/test/build green
+    checkmarks in every earlier developer.log entry were real for code
+    correctness but did NOT catch this, since Dart analysis has no way to
+    know a runtime String.fromEnvironment() value will be empty.
