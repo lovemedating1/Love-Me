@@ -3945,3 +3945,109 @@ paths may still be wanted later; neither is replaced or removed).
   signing, the unanswered schema-verification thread) plus whatever
   backend delivers/flags in response to this doc.
 
+2026-07-15 — GIT CORRUPTION WORKAROUND + FULL SESSION PUSHED. The original
+`love_me` working copy's `.git/objects/` had genuine NTFS-level corruption
+(an object-directory entry reporting an impossible 8.8-exabyte size with
+garbage timestamps) that made every `git add`/`hash-object -w` targeting
+certain hash prefixes fail with "unable to create temporary file: Invalid
+argument" — not a git bug, a filesystem-level fault, confirmed via `stat`
+showing a nonsensical inode/size/link-count for the offending path.
+`chkdsk /f /r` was the real fix but too slow to run mid-session; instead,
+cloned the repo fresh into a sibling `love_me_fresh` folder (clean `.git`,
+same `origin/main` history), copied the entire working tree over via
+`robocopy`, re-verified `flutter analyze`/`test` passed identically in the
+clone, removed one thing that shouldn't have been swept in (a 169KB stale
+Kotlin build-cache folder, `build_stale_20260710181644/`, added a
+`build_stale_*/` `.gitignore` rule), and committed+pushed the entire
+session's work (A-TIER through FINAL TIER, ~155 files) to `origin/main` as
+a single commit (`f091f38`). `love_me_fresh` is now the working copy of
+record; the original `love_me` folder's `.git` corruption was left
+unrepaired (user's call whether to `chkdsk` it later or just delete it).
+
+2026-07-15 — ANDROID RELEASE SIGNING WIRED (real keystore, no longer
+debug-signed). User generated a real keystore
+(`C:\Users\acer\keystores\loveme-release.jks`, alias `loveme`, valid until
+2053). Added `android/key.properties` (gitignored — never committed) +
+`android/key.properties.example` (committed template, no real secrets) +
+`.gitignore` rules for `key.properties`/`*.jks`/`*.keystore`.
+`android/app/build.gradle.kts` rewritten: loads `key.properties` if
+present, wires a real `signingConfigs.release` from it, and the `release`
+build type signs with it — falls back to the debug keys automatically if
+`key.properties` is absent (so a fresh checkout/CI without the keystore
+still builds, just not a real signed release). Built a real
+`flutter build apk --release` and **verified with `apksigner verify
+--print-certs`** that the resulting APK's certificate fingerprint matches
+the real keystore (`CN=randy, OU=loveme, O=loveme, L=Nairobi, ST=Nairobi,
+C=KE`), not the debug cert — confirms the wiring actually works, not just
+that it compiles. One unrelated hiccup during this: the first release
+build attempt crashed with a genuine JVM out-of-memory error in the Gradle
+daemon (native mmap failure, `-Xmx8G` exceeding available system memory) —
+not a signing/config issue, a retry succeeded cleanly. **Android release
+signing is no longer a launch blocker.**
+
+2026-07-15 — BACKEND ANSWERED THE SCHEMA-VERIFICATION QUESTIONS (sent
+2026-07-11, previously unanswered — this closes that loose end).
+`app doctumant/Schema Verification Response.md` covers `profiles`,
+`active_sessions`, `fcm_tokens`, `user_presence`, plus 3 general/process
+questions, with the actual `create table` SQL for each rather than prose.
+Cross-checked every flagged item against the actual client code before
+assuming anything needed fixing:
+- **`profiles`** — confirmed all the previously-disputed columns
+  (`photo_verification`, `is_suspended`/etc., `profiles_viewed_count`/etc.,
+  `notify_safety_*`) are real and live, not aspirational; an earlier
+  client-side doc (`migration_001.md`) was the one that was wrong/
+  incomplete. Backend explicitly said NOT to build against
+  `profiles_viewed_count`/`profiles_viewed_reset_at` (dead columns — real
+  quota enforcement is `get_view_quota()`/`record_profile_view()`) or
+  `notify_safety_*`/`is_suspended`/etc. (schema-only, nothing reads/writes
+  them yet, no admin tooling exists). Grepped the client: confirmed **zero
+  references to any of these columns anywhere in `lib/`** — nothing to
+  fix, already compliant with backend's guidance by virtue of never having
+  built against speculative schema.
+- **`active_sessions`** — backend found and fixed a real bug on their own
+  side (a trigger referencing a column that didn't exist yet, silently
+  erroring every heartbeat `UPDATE` — now fixed via `024_active_sessions_
+  updated_at_fix.sql`, no client action needed). Backend also asked
+  whether `registerSession()`'s "always insert a new row" behavior was
+  intentional (their schema supports both "one row per device" and "one
+  row per login event" models) — verified against
+  `device_session_repository.dart`/`device_session_registrar.dart`: this
+  was **already a deliberate, already-documented design choice**
+  ("only call it once per actual sign-in... the row itself is
+  intentionally left... a history of this device's past sessions"), not
+  an oversight. No change needed, just confirmed intentional.
+- **`fcm_tokens`** — backend flagged a **required client change**: the
+  unique constraint changed from global `token` to `(user_id, token)`,
+  meaning `onConflict: 'token'` would error post-migration. Checked
+  `fcm_service.dart`: **already correctly using `onConflict:
+  'user_id,token'`** — this was already fixed in an earlier session, nothing
+  to do.
+- **`user_presence`** — confirmed no staleness sweep exists server-side
+  (a real, acknowledged gap — a crashed/killed client can show "online"
+  indefinitely). Backend offered a client-side mitigation (derive "online"
+  from `last_seen` recency rather than trusting `is_online` blindly) as a
+  stopgap until a server-side sweep exists — **not implemented this
+  session**, flagged as a possible future improvement to `presence_repository.dart`/
+  wherever presence is displayed, not urgent enough to block on.
+- **Google Sign-In** — backend could not confirm from their repo alone
+  whether the OAuth provider is actually configured in the live Supabase
+  dashboard (no `[auth.external.google]` in `config.toml`, but dashboard-only
+  config wouldn't show there). Client's `signInWithGoogle()` already exists
+  and calls `signInWithOAuth(OAuthProvider.google)`, unchanged — backend's
+  recommendation was "don't assume this works," not "fix the client code,"
+  so nothing to change; just noting the risk that tapping "Sign in with
+  Google" in the live app may currently fail silently/error until backend
+  confirms the provider is enabled with a real client ID.
+- **Net result: zero client code changes required.** Every item backend
+  flagged as needing a fix was already correctly handled in the current
+  codebase (either from an earlier session's work, or because the client
+  never touched the schema-only/dead columns in the first place). This
+  response closes out the "unanswered schema-verification thread" item
+  that had been sitting on the known-gaps list since 2026-07-11.
+- Remaining known gaps after this: zero real automated test coverage,
+  ringtone preview audio, the `google-services.json` leftover
+  `com.example.love_me` entry, the Google Play service-account credential
+  (blocks real purchase verification), and the 3 manual device-verification
+  tasks (two-device Agora call, push "app fully closed" retest, live
+  blocking walkthrough).
+

@@ -668,18 +668,55 @@ session: identity verification had no backend to submit to.**
   exists for this yet. Every submission sits at `pending` until that's
   built — flagged for whenever it becomes a priority, not blocking.
 
+**RELEASE SIGNING — DONE (2026-07-15).** No longer debug-signed. Real
+keystore generated (`C:\Users\acer\keystores\loveme-release.jks`, alias
+`loveme`), wired via `android/key.properties` (gitignored) +
+`android/key.properties.example` (committed template) +
+`android/app/build.gradle.kts` (falls back to debug signing if
+`key.properties` is absent, so other checkouts/CI still build). Verified
+with `apksigner verify --print-certs` that a real `flutter build apk
+--release` is actually signed with the real keystore cert, not debug. See
+developer.log's 2026-07-15 entry.
+
+**SCHEMA-VERIFICATION THREAD — ANSWERED (2026-07-15).** Backend replied to
+the 2026-07-11 questions with actual migration SQL for `profiles`/
+`active_sessions`/`fcm_tokens`/`user_presence`
+(`app doctumant/Schema Verification Response.md`). Cross-checked every
+flagged item against the live client code — **zero client changes were
+needed**, everything backend called out as requiring a fix was already
+correctly handled (the `fcm_tokens` `onConflict: 'user_id,token'` fix and
+the dead-column avoidance were both already in place from earlier
+sessions). One real, acknowledged gap surfaced with no fix applied yet:
+**`user_presence` has no server-side staleness sweep** — a crashed/killed
+client can show "online" indefinitely; backend suggested deriving
+"online" from `last_seen` recency client-side as a stopgap, not
+implemented this pass. Also: Google Sign-In's server-side OAuth config
+could not be confirmed live (backend flagged this as a risk, not the
+client's problem to fix) — treat `signInWithGoogle()` as unverified until
+backend confirms the provider is enabled. See developer.log's 2026-07-15
+entry for the full per-table breakdown.
+
 **Remaining known gaps (none fixed yet, all flagged, user's call on
 priority):**
 - **Zero real test coverage** — 1 file, 2 trivial `AuthState` unit tests,
   no widget/integration/repository tests anywhere. The single biggest
   quality-risk item on this list.
-- **Android release signing** — still debug-signed
-  (`android/app/build.gradle.kts` still has the stock `// TODO: Add your
-  own signing config` comment). Blocks any real Play Store upload.
-- **`BACKEND_SCHEMA_VERIFICATION_QUESTIONS.md`** — sent 2026-07-11, still
-  unanswered. Just needs resending/following up with backend.
+- **`user_presence` staleness** — no server-side sweep; a killed app can
+  show "online" forever. Backend's suggested stopgap (derive online-ness
+  from `last_seen` recency) not yet implemented client-side.
+- **Google Sign-In unconfirmed** — backend could not verify from their
+  repo whether the Google OAuth provider is actually enabled in the live
+  Supabase dashboard. Don't assume `signInWithGoogle()` works until
+  confirmed.
 - **Ringtone preview audio** — cosmetic; all 3 options still play the
   same system sound pending 3 real audio files.
+- **`google-services.json` leftover entry** — has a stale
+  `com.example.love_me` client entry alongside the correct
+  `com.loveme.international` one; harmless but worth removing before a
+  real release.
+- **Google Play service-account credential** — `verify-purchase` Edge
+  Function is built but can't verify real purchases until someone with
+  Play Console access generates the service account JSON key.
 
 - **FINAL TIER — REAL GOOGLE PLAY BILLING BUILT (2026-07-15), BLOCKED ON
   BACKEND.** User supplied the real, locked 5-tier pricing table with
