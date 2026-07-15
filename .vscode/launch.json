@@ -8,7 +8,8 @@
       "program": "lib/main.dart",
       "args": [
         "--dart-define=SUPABASE_URL=https://tamlbnmihdcjiptbezjm.supabase.co",
-        "--dart-define=SUPABASE_ANON_KEY=sb_publishable_h9pOdpCGZ2wq0KiqTy2vHA_FUkHi-tW"
+        "--dart-define=SUPABASE_ANON_KEY=sb_publishable_h9pOdpCGZ2wq0KiqTy2vHA_FUkHi-tW",
+        "--dart-define=AGORA_APP_ID="
       ]
     }
   ]

@@ -19,16 +19,16 @@ class FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8, left: 2),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: AppColors.fgLight,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 8, left: 2),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 14.5,
+        fontWeight: FontWeight.w600,
+        color: AppColors.fgSoft,
+      ),
+    ),
+  );
 }
 
 /// The old app's "tap to select…" field — an outlined rounded box that
@@ -64,9 +64,7 @@ class _DropdownSheetFieldState extends State<DropdownSheetField> {
 
   SheetOption? get _selectedOption => widget.selected == null
       ? null
-      : widget.options
-          .where((o) => o.value == widget.selected)
-          .firstOrNull;
+      : widget.options.where((o) => o.value == widget.selected).firstOrNull;
 
   @override
   Widget build(BuildContext context) {
@@ -84,84 +82,89 @@ class _DropdownSheetFieldState extends State<DropdownSheetField> {
   }
 
   Widget _pill(SheetOption option) => GestureDetector(
-        onTap: () => setState(() => _open = !_open),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.pink,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  option.emoji == null
-                      ? option.label
-                      : '${option.label} ${option.emoji}',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w700),
-                ),
+    onTap: () => setState(() => _open = !_open),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.pink,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              option.emoji == null
+                  ? option.label
+                  : '${option.label} ${option.emoji}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
               ),
-              GestureDetector(
-                onTap: () => widget.onChanged(null),
-                child: const Icon(Icons.close, color: Colors.white, size: 18),
-              ),
-            ],
+            ),
           ),
-        ),
-      );
+          GestureDetector(
+            onTap: () => widget.onChanged(null),
+            child: const Icon(Icons.close, color: Colors.white, size: 18),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _field(SheetOption? option) => GestureDetector(
-        onTap: () => setState(() => _open = !_open),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.cardLight,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderLight),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  option == null
-                      ? widget.hint
-                      : (option.emoji == null
-                          ? option.label
-                          : '${option.label} ${option.emoji}'),
-                  style: TextStyle(
-                    color: option == null
-                        ? AppColors.mutedFg
-                        : AppColors.fgLight,
-                    fontWeight:
-                        option == null ? FontWeight.normal : FontWeight.w600,
-                  ),
-                ),
+    onTap: () => setState(() => _open = !_open),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.cardLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              option == null
+                  ? widget.hint
+                  : (option.emoji == null
+                        ? option.label
+                        : '${option.label} ${option.emoji}'),
+              style: TextStyle(
+                color: option == null ? AppColors.mutedFg : AppColors.fgSoft,
+                fontWeight: option == null
+                    ? FontWeight.normal
+                    : FontWeight.w600,
               ),
-              Icon(_open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  color: AppColors.mutedFg),
-            ],
+            ),
           ),
-        ),
-      );
+          Icon(
+            _open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+            color: AppColors.mutedFg,
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _optionsList() => Container(
-        margin: const EdgeInsets.only(top: 8),
-        decoration: BoxDecoration(
-          color: AppColors.cardLight,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
-            BoxShadow(color: Color(0x1F000000), blurRadius: 16, offset: Offset(0, 6)),
-          ],
+    margin: const EdgeInsets.only(top: 8),
+    decoration: BoxDecoration(
+      color: AppColors.cardLight,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x1F000000),
+          blurRadius: 16,
+          offset: Offset(0, 6),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final o in widget.options) _optionRow(o),
-          ],
-        ),
-      );
+      ],
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [for (final o in widget.options) _optionRow(o)],
+    ),
+  );
 
   Widget _optionRow(SheetOption o) {
     final selected = o.value == widget.selected;
@@ -177,8 +180,8 @@ class _DropdownSheetFieldState extends State<DropdownSheetField> {
         child: Text(
           o.emoji == null ? o.label : '${o.label} ${o.emoji}',
           style: TextStyle(
-            fontWeight: selected ? FontWeight.w800 : FontWeight.normal,
-            color: AppColors.fgLight,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+            color: AppColors.fgSoft,
           ),
         ),
       ),
@@ -194,18 +197,18 @@ class WarningBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.chipYellowBg,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.goldWarm, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: child),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppColors.chipYellowBg,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.error_outline, color: AppColors.goldWarm, size: 18),
+        const SizedBox(width: 8),
+        Expanded(child: child),
+      ],
+    ),
+  );
 }

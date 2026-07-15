@@ -105,8 +105,10 @@ class SupabaseProfilePhotoRepository implements ProfilePhotoRepository {
   sb.SupabaseClient get _client => sb.Supabase.instance.client;
 
   @override
-  Future<String> uploadPhoto(Uint8List bytes,
-      {required String fileExtension}) async {
+  Future<String> uploadPhoto(
+    Uint8List bytes, {
+    required String fileExtension,
+  }) async {
     final myId = _client.auth.currentUser!.id;
     final path = '$myId/${const Uuid().v4()}.$fileExtension';
     final contentType = switch (fileExtension) {
@@ -115,7 +117,9 @@ class SupabaseProfilePhotoRepository implements ProfilePhotoRepository {
       _ => 'image/jpeg',
     };
     try {
-      await _client.storage.from(kAvatarsBucket).uploadBinary(
+      await _client.storage
+          .from(kAvatarsBucket)
+          .uploadBinary(
             path,
             bytes,
             fileOptions: sb.FileOptions(contentType: contentType, upsert: true),
@@ -178,8 +182,8 @@ class SupabaseProfilePhotoRepository implements ProfilePhotoRepository {
   }
 
   @override
-  Future<void> setPrimary(String photoId) => _client
-      .rpc('set_primary_profile_photo', params: {'photo_id': photoId});
+  Future<void> setPrimary(String photoId) =>
+      _client.rpc('set_primary_profile_photo', params: {'photo_id': photoId});
 
   @override
   Future<void> deletePhoto(String photoId) =>

@@ -8,9 +8,11 @@ environment:
 
 # ---------------------------------------------------------------------------
 # Front end (Phases 1-4) + backend-integration track (Auth & Profile layer).
-# Firebase, flutter_webrtc, payment SDKs, in_app_purchase remain DEFERRED
-# until the tables/features they back are live. geolocator added 2026-07-10
-# for real onboarding GPS capture.
+# geolocator added 2026-07-10 for real onboarding GPS capture.
+# firebase_core/firebase_messaging added 2026-07-11 for push notifications
+# (client side only — see developer.log). in_app_purchase added 2026-07-15
+# for real Google Play Billing (FINAL TIER — see BACKEND_PAYMENTS_HANDOFF.md).
+# flutter_webrtc remains unused (calling uses Agora, not WebRTC directly).
 # ---------------------------------------------------------------------------
 dependencies:
   flutter:
@@ -30,6 +32,14 @@ dependencies:
   video_thumbnail: ^0.5.3   # thumbnail for chat video messages (DB-required)
   path_provider: ^2.1.4     # temp paths for recording/thumbnail files
   geolocator: ^13.0.2       # real GPS capture for onboarding "use my location"
+  flutter_ringtone_player: ^4.0.0+2  # plays the device's system notification sound (Settings ringtone preview)
+
+  # Voice / video calling
+  agora_rtc_engine: ^6.5.0  # Agora RTC engine (media transport for calls)
+  permission_handler: ^11.3.1  # runtime mic/camera permission for calls
+
+  # Billing (Google Play subscriptions)
+  in_app_purchase: ^3.2.0
 
   # State & DI
   flutter_riverpod: ^2.6.1
@@ -61,6 +71,9 @@ dependencies:
   json_annotation: ^4.9.0
   logger: ^2.5.0
   shared_preferences: ^2.3.3
+  firebase_core: ^4.11.0
+  firebase_messaging: ^16.4.1
+  flutter_local_notifications: ^22.0.1
 
 dev_dependencies:
   flutter_test:

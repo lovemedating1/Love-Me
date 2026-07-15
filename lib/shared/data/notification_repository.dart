@@ -41,10 +41,7 @@ class SupabaseNotificationRepository implements NotificationRepository {
   @override
   Future<void> markAsRead(String notificationId) => _client
       .from('notifications')
-      .update({
-        'is_read': true,
-        'read_at': DateTime.now().toIso8601String(),
-      })
+      .update({'is_read': true, 'read_at': DateTime.now().toIso8601String()})
       .eq('id', notificationId);
 
   @override
@@ -53,23 +50,29 @@ class SupabaseNotificationRepository implements NotificationRepository {
 
   @override
   Future<NotificationPreferences> getPreferences() async {
-    final row = await _client.from('notification_preferences').select().single();
+    final row = await _client
+        .from('notification_preferences')
+        .select()
+        .single();
     return NotificationPreferences.fromJson(row);
   }
 
   @override
   Future<void> updatePreferences(NotificationPreferences prefs) {
     final myId = _client.auth.currentUser!.id;
-    return _client.from('notification_preferences').update({
-      'push_enabled': prefs.pushEnabled,
-      'email_enabled': prefs.emailEnabled,
-      'like_notifications': prefs.likeNotifications,
-      'match_notifications': prefs.matchNotifications,
-      'message_notifications': prefs.messageNotifications,
-      'call_notifications': prefs.callNotifications,
-      'profile_view_notifications': prefs.profileViewNotifications,
-      'marketing_notifications': prefs.marketingNotifications,
-    }).eq('user_id', myId);
+    return _client
+        .from('notification_preferences')
+        .update({
+          'push_enabled': prefs.pushEnabled,
+          'email_enabled': prefs.emailEnabled,
+          'like_notifications': prefs.likeNotifications,
+          'match_notifications': prefs.matchNotifications,
+          'message_notifications': prefs.messageNotifications,
+          'call_notifications': prefs.callNotifications,
+          'profile_view_notifications': prefs.profileViewNotifications,
+          'marketing_notifications': prefs.marketingNotifications,
+        })
+        .eq('user_id', myId);
   }
 
   @override

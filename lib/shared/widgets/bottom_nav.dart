@@ -29,11 +29,7 @@ class NavDestination {
 
 /// The 5-tab bottom navigation shared by all AppShell screens.
 class BottomNav extends StatelessWidget {
-  const BottomNav({
-    super.key,
-    required this.currentRoute,
-    required this.onTap,
-  });
+  const BottomNav({super.key, required this.currentRoute, required this.onTap});
 
   final String currentRoute;
   final void Function(String route) onTap;
@@ -119,7 +115,9 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = selected ? scheme.primary : scheme.onSurface.withValues(alpha: 0.55);
+    final color = selected
+        ? scheme.primary
+        : scheme.onSurface.withValues(alpha: 0.55);
     final icon = selected
         ? (destination.activeIcon ?? destination.icon)
         : destination.icon;
@@ -138,17 +136,22 @@ class _NavItem extends StatelessWidget {
                   top: -4,
                   child: Container(
                     padding: const EdgeInsets.all(3),
-                    constraints:
-                        const BoxConstraints(minWidth: 16, minHeight: 16),
-                    decoration:
-                        BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      shape: BoxShape.circle,
+                    ),
                     child: Text(
                       '${destination.badgeCount}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700),
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 )
@@ -160,7 +163,9 @@ class _NavItem extends StatelessWidget {
                     width: 8,
                     height: 8,
                     decoration: const BoxDecoration(
-                        color: Color(0xFFFFB800), shape: BoxShape.circle),
+                      color: Color(0xFFFFB800),
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
             ],
@@ -169,9 +174,10 @@ class _NavItem extends StatelessWidget {
           Text(
             destination.label,
             style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+              color: color,
+              fontSize: 11,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 3),
           // The small pink dot under the active tab (old app).

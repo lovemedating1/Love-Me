@@ -16,8 +16,9 @@ class ResetPasswordDialog extends ConsumerStatefulWidget {
 }
 
 class _ResetPasswordDialogState extends ConsumerState<ResetPasswordDialog> {
-  late final TextEditingController _email =
-      TextEditingController(text: widget.initialEmail);
+  late final TextEditingController _email = TextEditingController(
+    text: widget.initialEmail,
+  );
   final _formKey = GlobalKey<FormState>();
   bool _sending = false;
   bool _sent = false;
@@ -31,8 +32,14 @@ class _ResetPasswordDialogState extends ConsumerState<ResetPasswordDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _sending = true);
-    await ref.read(authControllerProvider.notifier).requestPasswordReset(_email.text.trim());
-    if (mounted) setState(() { _sending = false; _sent = true; });
+    await ref
+        .read(authControllerProvider.notifier)
+        .requestPasswordReset(_email.text.trim());
+    if (mounted)
+      setState(() {
+        _sending = false;
+        _sent = true;
+      });
   }
 
   @override
@@ -40,8 +47,10 @@ class _ResetPasswordDialogState extends ConsumerState<ResetPasswordDialog> {
     return AlertDialog(
       title: const Text('Reset password'),
       content: _sent
-          ? const Text('If that email exists, a reset link is on its way. '
-              'Check your inbox.')
+          ? const Text(
+              'If that email exists, a reset link is on its way. '
+              'Check your inbox.',
+            )
           : Form(
               key: _formKey,
               child: Column(
@@ -78,7 +87,10 @@ class _ResetPasswordDialogState extends ConsumerState<ResetPasswordDialog> {
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Text('Send link'),
               ),
             ],

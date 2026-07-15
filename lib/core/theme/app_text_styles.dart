@@ -13,29 +13,59 @@ class AppTextStyles {
     return TextTheme(
       // Display / Logo
       displayLarge: GoogleFonts.roboto(
-          fontSize: 32, fontWeight: FontWeight.w900, color: fg),
+        fontSize: 32,
+        fontWeight: FontWeight.w900,
+        color: fg,
+      ),
       displayMedium: GoogleFonts.roboto(
-          fontSize: 28, fontWeight: FontWeight.w900, color: fg),
+        fontSize: 28,
+        fontWeight: FontWeight.w900,
+        color: fg,
+      ),
       // Headings
       headlineMedium: GoogleFonts.roboto(
-          fontSize: 24, fontWeight: FontWeight.w700, color: fg),
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        color: fg,
+      ),
       titleLarge: GoogleFonts.roboto(
-          fontSize: 20, fontWeight: FontWeight.w700, color: fg),
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        color: fg,
+      ),
       titleMedium: GoogleFonts.roboto(
-          fontSize: 18, fontWeight: FontWeight.w500, color: fg),
+        fontSize: 18,
+        fontWeight: FontWeight.w500,
+        color: fg,
+      ),
       // Body
       bodyLarge: GoogleFonts.roboto(
-          fontSize: 16, fontWeight: FontWeight.w400, color: fg),
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        color: fg,
+      ),
       bodyMedium: GoogleFonts.roboto(
-          fontSize: 14, fontWeight: FontWeight.w400, color: fg),
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: fg,
+      ),
       bodySmall: GoogleFonts.roboto(
-          fontSize: 12, fontWeight: FontWeight.w400, color: muted),
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: muted,
+      ),
       // Micro / badge
       labelSmall: GoogleFonts.roboto(
-          fontSize: 11, fontWeight: FontWeight.w500, color: muted),
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: muted,
+      ),
       // Button
       labelLarge: GoogleFonts.roboto(
-          fontSize: 14, fontWeight: FontWeight.w500, color: fg),
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: fg,
+      ),
     );
   }
 }

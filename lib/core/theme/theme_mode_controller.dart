@@ -37,5 +37,6 @@ class ThemeModeController extends Notifier<ThemeMode> {
   bool get isDark => state == ThemeMode.dark;
 }
 
-final themeModeProvider =
-    NotifierProvider<ThemeModeController, ThemeMode>(ThemeModeController.new);
+final themeModeProvider = NotifierProvider<ThemeModeController, ThemeMode>(
+  ThemeModeController.new,
+);

@@ -38,8 +38,7 @@ class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
 
   @override
-  ConsumerState<ProfileSetupScreen> createState() =>
-      _ProfileSetupScreenState();
+  ConsumerState<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
 }
 
 class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
@@ -89,24 +88,46 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   ];
   static const _goalOptions = [
     SheetOption('Looking for a lover', 'Looking for a lover', emoji: '💕'),
-    SheetOption('Need a serious relationship', 'Need a serious relationship',
-        emoji: '💍'),
-    SheetOption('Looking for genuine connections',
-        'Looking for genuine connections',
-        emoji: '🤝'),
-    SheetOption('Just here to make friends', 'Just here to make friends',
-        emoji: '👋'),
-    SheetOption('Looking for something casual', 'Looking for something casual',
-        emoji: '🌸'),
+    SheetOption(
+      'Need a serious relationship',
+      'Need a serious relationship',
+      emoji: '💍',
+    ),
+    SheetOption(
+      'Looking for genuine connections',
+      'Looking for genuine connections',
+      emoji: '🤝',
+    ),
+    SheetOption(
+      'Just here to make friends',
+      'Just here to make friends',
+      emoji: '👋',
+    ),
+    SheetOption(
+      'Looking for something casual',
+      'Looking for something casual',
+      emoji: '🌸',
+    ),
     SheetOption('Open to anything', 'Open to anything', emoji: '🌈'),
   ];
   static const _hobbyOptions = [
-    ('Coffee Lover', '☕'), ('Travel Enthusiast', '✈️'),
-    ('Photography', '📸'), ('Yoga', '🧘'), ('Music', '🎵'),
-    ('Hiking', '🥾'), ('Cooking', '🍳'), ('Fitness', '💪'),
-    ('Art', '🎨'), ('Reading', '📚'), ('Dancing', '💃'),
-    ('Gaming', '🎮'), ('Surfing', '🏄'), ('Movies', '🎬'),
-    ('Dogs', '🐕'), ('Cats', '🐱'), ('Wine', '🍷'),
+    ('Coffee Lover', '☕'),
+    ('Travel Enthusiast', '✈️'),
+    ('Photography', '📸'),
+    ('Yoga', '🧘'),
+    ('Music', '🎵'),
+    ('Hiking', '🥾'),
+    ('Cooking', '🍳'),
+    ('Fitness', '💪'),
+    ('Art', '🎨'),
+    ('Reading', '📚'),
+    ('Dancing', '💃'),
+    ('Gaming', '🎮'),
+    ('Surfing', '🏄'),
+    ('Movies', '🎬'),
+    ('Dogs', '🐕'),
+    ('Cats', '🐱'),
+    ('Wine', '🍷'),
   ];
 
   @override
@@ -118,11 +139,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   void _toast(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(msg),
-        backgroundColor: error ? AppColors.destructive : AppColors.pink,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: error ? AppColors.destructive : AppColors.pink,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   String? _validateStep() {
@@ -162,27 +185,31 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     final userId = Supabase.instance.client.auth.currentUser!.id;
     try {
       final fix = _locationFix;
-      await Supabase.instance.client.from('profiles').update({
-        'name': _name.text.trim(),
-        'birthday':
-            '${_dob!.year.toString().padLeft(4, '0')}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}',
-        'marital_status': _maritalStatus,
-        'orientation': _orientation,
-        'interested_in': _interestedIn,
-        'relationship_goal': _goal,
-        'hobbies': _hobbies.toList(),
-        if (fix != null) 'location_lat': fix.latitude,
-        if (fix != null) 'location_lng': fix.longitude,
-        if (fix != null) 'location_accuracy_m': fix.accuracyMeters,
-        'profile_complete': true,
-      }).eq('user_id', userId);
+      await Supabase.instance.client
+          .from('profiles')
+          .update({
+            'name': _name.text.trim(),
+            'birthday':
+                '${_dob!.year.toString().padLeft(4, '0')}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}',
+            'marital_status': _maritalStatus,
+            'orientation': _orientation,
+            'interested_in': _interestedIn,
+            'relationship_goal': _goal,
+            'hobbies': _hobbies.toList(),
+            if (fix != null) 'location_lat': fix.latitude,
+            if (fix != null) 'location_lng': fix.longitude,
+            if (fix != null) 'location_accuracy_m': fix.accuracyMeters,
+            'profile_complete': true,
+          })
+          .eq('user_id', userId);
       ref.read(authControllerProvider.notifier).markProfileComplete();
       if (mounted) {
         _toast('Profile complete! Welcome to Love Me.');
         context.go(RoutePaths.discover);
       }
     } catch (_) {
-      if (mounted) _toast('Could not save your profile — try again.', error: true);
+      if (mounted)
+        _toast('Could not save your profile — try again.', error: true);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -206,8 +233,10 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       final picked = await picker.pickProfilePhoto(source);
 
       final repo = ref.read(profilePhotoRepositoryProvider);
-      final url = await repo.uploadPhoto(picked.bytes,
-          fileExtension: picked.fileExtension);
+      final url = await repo.uploadPhoto(
+        picked.bytes,
+        fileExtension: picked.fileExtension,
+      );
       final displayOrder = _photoUrls.length + 1;
       await repo.addPhoto(
         photoUrl: url,
@@ -222,9 +251,10 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     } on NoFaceDetectedException {
       if (mounted) {
         _toast(
-            'That doesn\'t look like a photo of a person. Please upload a '
-            'clear photo of yourself.',
-            error: true);
+          'That doesn\'t look like a photo of a person. Please upload a '
+          'clear photo of yourself.',
+          error: true,
+        );
       }
     } on MediaUploadException catch (e) {
       if (mounted) _toast(e.message, error: true);
@@ -271,10 +301,11 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       if (mounted) {
         setState(() => _locating = false);
         _toast(
-            e.permanently
-                ? 'Location permission denied — enable it in system settings.'
-                : 'Location permission denied.',
-            error: true);
+          e.permanently
+              ? 'Location permission denied — enable it in system settings.'
+              : 'Location permission denied.',
+          error: true,
+        );
       }
     } catch (_) {
       if (mounted) {
@@ -285,9 +316,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   }
 
   void _clearLocation() => setState(() {
-        _locationFix = null;
-        _locationLabel = null;
-      });
+    _locationFix = null;
+    _locationLabel = null;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -316,26 +347,24 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   }
 
   Widget _progressBar() => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-        child: Row(
-          children: [
-            for (var i = 0; i < _steps; i++) ...[
-              Expanded(
-                child: Container(
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: i <= _step
-                        ? AppColors.pink
-                        : AppColors.borderLight,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
+    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+    child: Row(
+      children: [
+        for (var i = 0; i < _steps; i++) ...[
+          Expanded(
+            child: Container(
+              height: 6,
+              decoration: BoxDecoration(
+                color: i <= _step ? AppColors.pink : AppColors.borderLight,
+                borderRadius: BorderRadius.circular(3),
               ),
-              if (i < _steps - 1) const SizedBox(width: 6),
-            ],
-          ],
-        ),
-      );
+            ),
+          ),
+          if (i < _steps - 1) const SizedBox(width: 6),
+        ],
+      ],
+    ),
+  );
 
   Widget _stepContent() {
     switch (_step) {
@@ -351,175 +380,198 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   }
 
   Widget _stepHeader(String emoji, String title, String subtitle) => Column(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 48)),
-          const SizedBox(height: 10),
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.fgLight)),
-          const SizedBox(height: 4),
-          Text(subtitle,
-              style: const TextStyle(color: AppColors.mutedFg, fontSize: 15)),
-          const SizedBox(height: 24),
-        ],
-      );
+    children: [
+      Text(emoji, style: const TextStyle(fontSize: 48)),
+      const SizedBox(height: 10),
+      Text(
+        title,
+        style: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w800,
+          color: AppColors.fgLight,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        subtitle,
+        style: const TextStyle(color: AppColors.mutedFg, fontSize: 15),
+      ),
+      const SizedBox(height: 24),
+    ],
+  );
 
   // ---- Step 1: About You -------------------------------------------------
 
   Widget _step1() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _stepHeader('👤', 'About You', 'Let\'s get to know you'),
-          const FieldLabel('Your Name'),
-          TextField(
-            controller: _name,
-            decoration: const InputDecoration(
-                hintText: 'Enter your name',
-                prefixIcon: Icon(LucideIcons.user)),
-          ),
-          const SizedBox(height: 16),
-          const FieldLabel('Your Birthday'),
-          InkWell(
-            onTap: () async {
-              final now = DateTime.now();
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: DateTime(now.year - 20),
-                firstDate: DateTime(now.year - 100),
-                lastDate: now,
-              );
-              if (picked != null) setState(() => _dob = picked);
-            },
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardLight,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.borderLight),
-                    ),
-                    child: Row(
-                      children: [
-                        const Text('🎂', style: TextStyle(fontSize: 18)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _dob == null
-                                ? ''
-                                : '${_dob!.month.toString().padLeft(2, '0')}/${_dob!.day.toString().padLeft(2, '0')}/${_dob!.year}',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down,
-                            color: AppColors.mutedFg),
-                      ],
-                    ),
-                  ),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _stepHeader('👤', 'About You', 'Let\'s get to know you'),
+      const FieldLabel('Your Name'),
+      TextField(
+        controller: _name,
+        decoration: const InputDecoration(
+          hintText: 'Enter your name',
+          prefixIcon: Icon(LucideIcons.user),
+        ),
+      ),
+      const SizedBox(height: 16),
+      const FieldLabel('Your Birthday'),
+      InkWell(
+        onTap: () async {
+          final now = DateTime.now();
+          final picked = await showDatePicker(
+            context: context,
+            initialDate: DateTime(now.year - 20),
+            firstDate: DateTime(now.year - 100),
+            lastDate: now,
+          );
+          if (picked != null) setState(() => _dob = picked);
+        },
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
                 ),
-                if (_dob != null) ...[
-                  const SizedBox(width: 10),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.chipPinkBg,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      children: [
-                        Text('${Validators.ageFrom(_dob!)}',
-                            style: const TextStyle(
-                                color: AppColors.pink,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 18)),
-                        const Text('YEARS OLD',
-                            style: TextStyle(
-                                color: AppColors.pink,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          const WarningBanner(
-            child: Text.rich(
-              TextSpan(
-                style: TextStyle(color: AppColors.fgLight, fontSize: 12.5),
-                children: [
-                  TextSpan(text: 'Enter the '),
-                  TextSpan(
-                      text: 'exact birthday',
-                      style: TextStyle(fontWeight: FontWeight.w800)),
-                  TextSpan(text: ' shown on your '),
-                  TextSpan(
-                      text: 'National ID, Visa, Birth Certificate or Driving '
-                          'Licence',
-                      style: TextStyle(fontWeight: FontWeight.w800)),
-                  TextSpan(
-                      text: '. It will be used during identity verification '
-                          '— mismatches may block your account.'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                decoration: BoxDecoration(
+                  color: AppColors.cardLight,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Row(
                   children: [
-                    const FieldLabel('I am a…'),
-                    DropdownSheetField(
-                      hint: 'Tap to select…',
-                      options: _maritalOptions,
-                      selected: _maritalStatus,
-                      removable: true,
-                      onChanged: (v) => setState(() => _maritalStatus = v),
+                    const Text('🎂', style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _dob == null
+                            ? ''
+                            : '${_dob!.month.toString().padLeft(2, '0')}/${_dob!.day.toString().padLeft(2, '0')}/${_dob!.year}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: AppColors.mutedFg,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+            ),
+            if (_dob != null) ...[
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.chipPinkBg,
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const FieldLabel('My orientation'),
-                    DropdownSheetField(
-                      hint: 'Tap to select…',
-                      options: _orientationOptions,
-                      selected: _orientation,
-                      removable: true,
-                      onChanged: (v) => setState(() => _orientation = v),
+                    Text(
+                      '${Validators.ageFrom(_dob!)}',
+                      style: const TextStyle(
+                        color: AppColors.pink,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const Text(
+                      'YEARS OLD',
+                      style: TextStyle(
+                        color: AppColors.pink,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+      const WarningBanner(
+        child: Text.rich(
+          TextSpan(
+            style: TextStyle(color: AppColors.fgSoft, fontSize: 12.5),
+            children: [
+              TextSpan(text: 'Enter the '),
+              TextSpan(
+                text: 'exact birthday',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              TextSpan(text: ' shown on your '),
+              TextSpan(
+                text:
+                    'National ID, Visa, Birth Certificate or Driving '
+                    'Licence',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              TextSpan(
+                text:
+                    '. It will be used during identity verification '
+                    '— mismatches may block your account.',
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          const FieldLabel('I\'m interested in seeing'),
-          DropdownSheetField(
-            hint: 'Tap to select…',
-            options: _interestedInOptions,
-            selected: _interestedIn,
-            removable: true,
-            onChanged: (v) => setState(() => _interestedIn = v),
+        ),
+      ),
+      const SizedBox(height: 18),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const FieldLabel('I am a…'),
+                DropdownSheetField(
+                  hint: 'Tap to select…',
+                  options: _maritalOptions,
+                  selected: _maritalStatus,
+                  removable: true,
+                  onChanged: (v) => setState(() => _maritalStatus = v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const FieldLabel('My orientation'),
+                DropdownSheetField(
+                  hint: 'Tap to select…',
+                  options: _orientationOptions,
+                  selected: _orientation,
+                  removable: true,
+                  onChanged: (v) => setState(() => _orientation = v),
+                ),
+              ],
+            ),
           ),
         ],
-      );
+      ),
+      const SizedBox(height: 16),
+      const FieldLabel('I\'m interested in seeing'),
+      DropdownSheetField(
+        hint: 'Tap to select…',
+        options: _interestedInOptions,
+        selected: _interestedIn,
+        removable: true,
+        onChanged: (v) => setState(() => _interestedIn = v),
+      ),
+    ],
+  );
 
   // ---- Step 2: Add Your Photos -------------------------------------------
 
@@ -531,15 +583,22 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _stepHeader('📸', 'Add Your Photos',
-            'Upload $_mandatoryPhotoCount real photos — one at a time'),
+        _stepHeader(
+          '📸',
+          'Add Your Photos',
+          'Upload $_mandatoryPhotoCount real photos — one at a time',
+        ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Photo ${activeIndex + 1}/$_mandatoryPhotoCount',
-                style: const TextStyle(fontWeight: FontWeight.w700)),
-            Text('$verifiedCount/$_mandatoryPhotoCount verified',
-                style: const TextStyle(color: AppColors.mutedFg)),
+            Text(
+              'Photo ${activeIndex + 1}/$_mandatoryPhotoCount',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            Text(
+              '$verifiedCount/$_mandatoryPhotoCount verified',
+              style: const TextStyle(color: AppColors.mutedFg),
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -563,31 +622,36 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         ),
         const SizedBox(height: 20),
         if (verifiedCount < _mandatoryPhotoCount) ...[
-          Text('Photo ${activeIndex + 1} of $_mandatoryPhotoCount',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          Text(
+            'Photo ${activeIndex + 1} of $_mandatoryPhotoCount',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          ),
           const SizedBox(height: 2),
           Text(
             activeIndex == 0
                 ? 'Clear face, well lit.'
                 : (activeIndex == _mandatoryPhotoCount - 1
-                    ? 'One more to finish.'
-                    : 'Keep it real.'),
+                      ? 'One more to finish.'
+                      : 'Keep it real.'),
             textAlign: TextAlign.center,
             style: const TextStyle(color: AppColors.mutedFg),
           ),
           const SizedBox(height: 8),
           Center(
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.chipGreyBg,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: const Text('Not uploaded',
-                  style: TextStyle(
-                      color: AppColors.mutedFg, fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Not uploaded',
+                style: TextStyle(
+                  color: AppColors.mutedFg,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -595,26 +659,38 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             child: GestureDetector(
               onTap: _photoUploading ? null : _uploadPhoto,
               child: Container(
-                width: 220,
-                height: 220,
+                width: 160,
+                height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppColors.cardLight,
                   border: Border.all(
-                      color: AppColors.pink, width: 2, style: BorderStyle.solid),
+                    color: AppColors.pink,
+                    width: 2,
+                    style: BorderStyle.solid,
+                  ),
                 ),
                 child: _photoUploading
                     ? const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2))
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(LucideIcons.camera, color: AppColors.pink, size: 36),
-                          SizedBox(height: 8),
-                          Text('Tap to upload',
-                              style: TextStyle(
-                                  color: AppColors.pink,
-                                  fontWeight: FontWeight.w700)),
+                          Icon(
+                            LucideIcons.camera,
+                            color: AppColors.pink,
+                            size: 30,
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Tap to upload',
+                            style: TextStyle(
+                              color: AppColors.pink,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
                         ],
                       ),
               ),
@@ -654,15 +730,21 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: filled ? AppColors.success : AppColors.borderLight,
-                      width: filled ? 2 : 1),
+                    color: filled ? AppColors.success : AppColors.borderLight,
+                    width: filled ? 2 : 1,
+                  ),
                   color: AppColors.cardLight,
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: filled
-                    ? Image.network(_photoUrls[i], fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            const Icon(LucideIcons.image, color: AppColors.pink))
+                    ? Image.network(
+                        _photoUrls[i],
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          LucideIcons.image,
+                          color: AppColors.pink,
+                        ),
+                      )
                     : null,
               ),
               if (filled)
@@ -683,7 +765,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          filled ? '${i + 1}/$_mandatoryPhotoCount · Verified' : '${i + 1}/$_mandatoryPhotoCount · Not uploaded',
+          filled
+              ? '${i + 1}/$_mandatoryPhotoCount · Verified'
+              : '${i + 1}/$_mandatoryPhotoCount · Not uploaded',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 10,
@@ -698,151 +782,169 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   // ---- Step 3: Your Location ----------------------------------------------
 
   Widget _step3() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Column(
-              children: [
-                const Text('📍', style: TextStyle(fontSize: 48)),
-                const SizedBox(height: 10),
-                const Text('Your Location',
-                    style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.fgLight)),
-                const SizedBox(height: 4),
-                const Text('We use your device location to find people near you.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.mutedFg, fontSize: 15)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          GestureDetector(
-            onTap: _locating ? null : _useLocation,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: _locating
-                    ? AppColors.chipYellowBg
-                    : (_locationFix != null ? AppColors.gold : AppColors.cardLight),
-                borderRadius: BorderRadius.circular(999),
-                border: _locationFix == null && !_locating
-                    ? Border.all(color: AppColors.borderLight)
-                    : null,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (_locating)
-                    const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                  else
-                    const Icon(LucideIcons.mapPin, color: AppColors.fgLight),
-                  const SizedBox(width: 10),
-                  Text(
-                    _locating
-                        ? 'Detecting…'
-                        : (_locationFix != null
-                            ? 'Update My Location'
-                            : 'Use My Current Location'),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, color: AppColors.fgLight),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (_locationFix == null)
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Center(
+        child: Column(
+          children: [
+            const Text('📍', style: TextStyle(fontSize: 48)),
+            const SizedBox(height: 10),
             const Text(
-              'Tap the button above to detect your city and country automatically.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.mutedFg),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppColors.cardLight,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 3)),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(LucideIcons.mapPin, color: AppColors.pink, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(_locationLabel ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                  GestureDetector(
-                    onTap: _clearLocation,
-                    child: const CircleAvatar(
-                      radius: 13,
-                      backgroundColor: AppColors.chipGreyBg,
-                      child: Icon(Icons.close, size: 14, color: AppColors.mutedFg),
-                    ),
-                  ),
-                ],
+              'Your Location',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: AppColors.fgLight,
               ),
             ),
-        ],
-      );
+            const SizedBox(height: 4),
+            const Text(
+              'We use your device location to find people near you.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.mutedFg, fontSize: 15),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 32),
+      GestureDetector(
+        onTap: _locating ? null : _useLocation,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: _locating
+                ? AppColors.chipYellowBg
+                : (_locationFix != null ? AppColors.gold : AppColors.cardLight),
+            borderRadius: BorderRadius.circular(999),
+            border: _locationFix == null && !_locating
+                ? Border.all(color: AppColors.borderLight)
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_locating)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                const Icon(LucideIcons.mapPin, color: AppColors.fgSoft),
+              const SizedBox(width: 10),
+              Text(
+                _locating
+                    ? 'Detecting…'
+                    : (_locationFix != null
+                          ? 'Update My Location'
+                          : 'Use My Current Location'),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.fgSoft,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      if (_locationFix == null)
+        const Text(
+          'Tap the button above to detect your city and country automatically.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.mutedFg),
+        )
+      else
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.cardLight,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(LucideIcons.mapPin, color: AppColors.pink, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _locationLabel ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              GestureDetector(
+                onTap: _clearLocation,
+                child: const CircleAvatar(
+                  radius: 13,
+                  backgroundColor: AppColors.chipGreyBg,
+                  child: Icon(Icons.close, size: 14, color: AppColors.mutedFg),
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
 
   // ---- Step 4: Interests & Goals ------------------------------------------
 
   Widget _step4() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _stepHeader('💖', 'Interests & Goals', 'What are you into?'),
-          Row(
-            children: const [
-              Icon(LucideIcons.heart, size: 16, color: AppColors.fgLight),
-              SizedBox(width: 6),
-              Text('What are you looking for?',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          DropdownSheetField(
-            hint: 'Select your goal',
-            options: _goalOptions,
-            selected: _goal,
-            onChanged: (v) => setState(() => _goal = v),
-          ),
-          const SizedBox(height: 20),
-          const Text('Pick your hobbies (select multiple)',
-              style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          if (_hobbies.isNotEmpty) ...[
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final h in _hobbies)
-                  _selectedHobbyPill(h),
-              ],
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _stepHeader('💖', 'Interests & Goals', 'What are you into?'),
+      Row(
+        children: const [
+          Icon(LucideIcons.heart, size: 16, color: AppColors.fgSoft),
+          SizedBox(width: 6),
+          Text(
+            'What are you looking for?',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: AppColors.fgSoft,
             ),
-            const SizedBox(height: 8),
-          ],
-          _HobbyPicker(
-            options: _hobbyOptions,
-            selected: _hobbies,
-            onToggle: (h) => setState(() {
-              if (_hobbies.contains(h)) {
-                _hobbies.remove(h);
-              } else {
-                _hobbies.add(h);
-              }
-            }),
           ),
         ],
-      );
+      ),
+      const SizedBox(height: 8),
+      DropdownSheetField(
+        hint: 'Select your goal',
+        options: _goalOptions,
+        selected: _goal,
+        onChanged: (v) => setState(() => _goal = v),
+      ),
+      const SizedBox(height: 20),
+      const Text(
+        'Pick your hobbies (select multiple)',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 8),
+      if (_hobbies.isNotEmpty) ...[
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [for (final h in _hobbies) _selectedHobbyPill(h)],
+        ),
+        const SizedBox(height: 8),
+      ],
+      _HobbyPicker(
+        options: _hobbyOptions,
+        selected: _hobbies,
+        onToggle: (h) => setState(() {
+          if (_hobbies.contains(h)) {
+            _hobbies.remove(h);
+          } else {
+            _hobbies.add(h);
+          }
+        }),
+      ),
+    ],
+  );
 
   Widget _selectedHobbyPill(String hobby) {
     final emoji = _hobbyOptions
@@ -858,9 +960,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji == null ? hobby : '$hobby $emoji',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w700)),
+          Text(
+            emoji == null ? hobby : '$hobby $emoji',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(width: 6),
           GestureDetector(
             onTap: () => setState(() => _hobbies.remove(hobby)),
@@ -874,34 +980,35 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   // ---- Nav buttons ---------------------------------------------------------
 
   Widget _navButtons() => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              if (_step > 0)
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _submitting ? null : _back,
-                    style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                        shape: const StadiumBorder(),
-                        side: const BorderSide(color: AppColors.borderLight)),
-                    child: const Text('Back'),
-                  ),
+    top: false,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          if (_step > 0)
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _submitting ? null : _back,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  shape: const StadiumBorder(),
+                  side: const BorderSide(color: AppColors.borderLight),
                 ),
-              if (_step > 0) const SizedBox(width: 12),
-              Expanded(
-                child: GradientButton(
-                  label: _step == _steps - 1 ? 'Start Matching 🚀' : 'Continue',
-                  loading: _submitting,
-                  onPressed: _submitting ? null : _next,
-                ),
+                child: const Text('Back'),
               ),
-            ],
+            ),
+          if (_step > 0) const SizedBox(width: 12),
+          Expanded(
+            child: GradientButton(
+              label: _step == _steps - 1 ? 'Start Matching 🚀' : 'Continue',
+              loading: _submitting,
+              onPressed: _submitting ? null : _next,
+            ),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 /// The old app's hobby multi-select: a "Tap to select hobbies…" trigger that
@@ -949,15 +1056,17 @@ class _HobbyPickerState extends State<_HobbyPicker> {
                     style: TextStyle(
                       color: widget.selected.isEmpty
                           ? AppColors.mutedFg
-                          : AppColors.fgLight,
+                          : AppColors.fgSoft,
                       fontWeight: widget.selected.isEmpty
                           ? FontWeight.normal
-                          : FontWeight.w700,
+                          : FontWeight.w600,
                     ),
                   ),
                 ),
-                Icon(_open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                    color: AppColors.fgLight),
+                Icon(
+                  _open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  color: AppColors.fgSoft,
+                ),
               ],
             ),
           ),
@@ -971,7 +1080,11 @@ class _HobbyPickerState extends State<_HobbyPicker> {
               color: AppColors.cardLight,
               borderRadius: BorderRadius.circular(16),
               boxShadow: const [
-                BoxShadow(color: Color(0x1F000000), blurRadius: 16, offset: Offset(0, 6)),
+                BoxShadow(
+                  color: Color(0x1F000000),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
               ],
             ),
             child: SingleChildScrollView(
@@ -984,24 +1097,29 @@ class _HobbyPickerState extends State<_HobbyPicker> {
                       onTap: () => widget.onToggle(label),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: widget.selected.contains(label)
                               ? AppColors.pink
                               : AppColors.cardLight,
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                              color: widget.selected.contains(label)
-                                  ? AppColors.pink
-                                  : AppColors.borderLight),
+                            color: widget.selected.contains(label)
+                                ? AppColors.pink
+                                : AppColors.borderLight,
+                          ),
                         ),
-                        child: Text('$label $emoji',
-                            style: TextStyle(
-                              color: widget.selected.contains(label)
-                                  ? Colors.white
-                                  : AppColors.fgLight,
-                              fontWeight: FontWeight.w600,
-                            )),
+                        child: Text(
+                          '$label $emoji',
+                          style: TextStyle(
+                            color: widget.selected.contains(label)
+                                ? Colors.white
+                                : AppColors.fgSoft,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                 ],

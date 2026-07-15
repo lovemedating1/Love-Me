@@ -17,19 +17,23 @@ enum NotificationType {
   system,
 }
 
-NotificationType _typeFromString(String value) => switch (value) {
-      'new_like' => NotificationType.newLike,
-      'new_match' => NotificationType.newMatch,
-      'new_message' => NotificationType.newMessage,
-      'call_incoming' => NotificationType.callIncoming,
-      'call_missed' => NotificationType.callMissed,
-      'profile_view' => NotificationType.profileView,
-      'profile_verified' => NotificationType.profileVerified,
-      'subscription_expiring' => NotificationType.subscriptionExpiring,
-      'subscription_active' => NotificationType.subscriptionActive,
-      'report_update' => NotificationType.reportUpdate,
-      _ => NotificationType.system,
-    };
+/// Maps the wire-format `type` string (Supabase enum value, and also the
+/// FCM push payload's `data['type']` per migration_004.md) to
+/// [NotificationType]. Shared so the in-app feed and push handler parse
+/// the same values identically.
+NotificationType notificationTypeFromWireValue(String value) => switch (value) {
+  'new_like' => NotificationType.newLike,
+  'new_match' => NotificationType.newMatch,
+  'new_message' => NotificationType.newMessage,
+  'call_incoming' => NotificationType.callIncoming,
+  'call_missed' => NotificationType.callMissed,
+  'profile_view' => NotificationType.profileView,
+  'profile_verified' => NotificationType.profileVerified,
+  'subscription_expiring' => NotificationType.subscriptionExpiring,
+  'subscription_active' => NotificationType.subscriptionActive,
+  'report_update' => NotificationType.reportUpdate,
+  _ => NotificationType.system,
+};
 
 /// In-app activity feed item. The `data` payload's shape depends on [type] —
 /// see migration_004.md "Deep Link Payload" (e.g. `data['conversation_id']`
@@ -60,7 +64,7 @@ class AppNotification extends Equatable {
   factory AppNotification.fromJson(Map<String, dynamic> json) =>
       AppNotification(
         id: json['id'] as String,
-        type: _typeFromString(json['type'] as String),
+        type: notificationTypeFromWireValue(json['type'] as String),
         title: json['title'] as String? ?? '',
         body: json['body'] as String? ?? '',
         createdAt: DateTime.parse(json['created_at'] as String),

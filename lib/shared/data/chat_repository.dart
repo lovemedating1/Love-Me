@@ -37,7 +37,10 @@ class UploadedChatMedia {
 /// `create_conversation_on_match` trigger, so any active match can send
 /// media — see ConversationRepository.
 abstract interface class ChatRepository {
-  Future<List<ChatMessage>> getMessages(String conversationId, {int limit = 50});
+  Future<List<ChatMessage>> getMessages(
+    String conversationId, {
+    int limit = 50,
+  });
 
   Future<ChatMessage> sendTextMessage({
     required String conversationId,
@@ -73,8 +76,11 @@ abstract interface class ChatRepository {
   /// [bucketForType] picks the right private bucket from the message type.
   /// Returns `null` if [path] is null/empty. Media paths are stored (not
   /// URLs), so this is called every time a media bubble renders.
-  Future<String?> signedUrlFor(String? path, MessageType type,
-      {bool thumbnail = false});
+  Future<String?> signedUrlFor(
+    String? path,
+    MessageType type, {
+    bool thumbnail = false,
+  });
 
   Future<ChatMessage> sendMediaMessage({
     required String conversationId,
@@ -105,6 +111,24 @@ abstract interface class ChatRepository {
   sb.RealtimeChannel subscribeToMessages(
     String conversationId,
     void Function(ChatMessage) onNewMessage,
+  );
+
+  /// Broadcasts "I'm typing" on a per-conversation ephemeral channel — no
+  /// table, no persistence, purely a live signal (Supabase Realtime
+  /// Broadcast, not Postgres Changes). Fire-and-forget; the UI debounces
+  /// calls to this (see `chat_screen.dart`'s `_onComposerChanged`) so it
+  /// isn't sent on every keystroke.
+  Future<void> broadcastTyping(String conversationId);
+
+  /// Subscribes to the other participant's typing broadcasts on
+  /// [conversationId]. [onTyping] fires (with no payload beyond "someone is
+  /// typing right now") each time a broadcast arrives; the UI is
+  /// responsible for its own "stopped typing after N seconds of silence"
+  /// timeout, since there's no explicit "stopped typing" event — broadcast
+  /// is a fire-and-forget signal, not a stateful presence channel.
+  sb.RealtimeChannel subscribeToTyping(
+    String conversationId,
+    void Function() onTyping,
   );
 }
 
@@ -139,7 +163,9 @@ class SupabaseChatRepository implements ChatRepository {
   ) async {
     final path = '$conversationId/${const Uuid().v4()}.$ext';
     try {
-      await _client.storage.from(bucket).uploadBinary(
+      await _client.storage
+          .from(bucket)
+          .uploadBinary(
             path,
             bytes,
             fileOptions: sb.FileOptions(contentType: contentType, upsert: true),
@@ -163,15 +189,20 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<String?> signedUrlFor(String? path, MessageType type,
-      {bool thumbnail = false}) async {
+  Future<String?> signedUrlFor(
+    String? path,
+    MessageType type, {
+    bool thumbnail = false,
+  }) async {
     if (path == null || path.isEmpty) return null;
     // Legacy rows may still hold a full signed/public URL rather than a bare
     // object path — pass those through unchanged so old messages keep working.
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     final bucket = _bucketFor(type, thumbnail: thumbnail);
     try {
-      return await _client.storage.from(bucket).createSignedUrl(path, _signedUrlTtl);
+      return await _client.storage
+          .from(bucket)
+          .createSignedUrl(path, _signedUrlTtl);
     } catch (_) {
       // Non-fatal: a missing/denied object just renders the error placeholder.
       return null;
@@ -188,7 +219,12 @@ class SupabaseChatRepository implements ChatRepository {
         ? 'image/png'
         : (fileExtension == 'webp' ? 'image/webp' : 'image/jpeg');
     final path = await _uploadPrivate(
-        kChatImagesBucket, conversationId, bytes, fileExtension, contentType);
+      kChatImagesBucket,
+      conversationId,
+      bytes,
+      fileExtension,
+      contentType,
+    );
     return UploadedChatMedia(mediaPath: path);
   }
 
@@ -199,10 +235,20 @@ class SupabaseChatRepository implements ChatRepository {
     required String fileExtension,
     required Uint8List thumbnailBytes,
   }) async {
-    final mediaPath = await _uploadPrivate(kChatVideosBucket, conversationId,
-        bytes, fileExtension, 'video/mp4');
-    final thumbPath = await _uploadPrivate(kChatThumbsBucket, conversationId,
-        thumbnailBytes, 'jpg', 'image/jpeg');
+    final mediaPath = await _uploadPrivate(
+      kChatVideosBucket,
+      conversationId,
+      bytes,
+      fileExtension,
+      'video/mp4',
+    );
+    final thumbPath = await _uploadPrivate(
+      kChatThumbsBucket,
+      conversationId,
+      thumbnailBytes,
+      'jpg',
+      'image/jpeg',
+    );
     return UploadedChatMedia(mediaPath: mediaPath, thumbnailPath: thumbPath);
   }
 
@@ -212,14 +258,21 @@ class SupabaseChatRepository implements ChatRepository {
     Uint8List bytes, {
     String fileExtension = 'm4a',
   }) async {
-    final path = await _uploadPrivate(kVoiceMessagesBucket, conversationId,
-        bytes, fileExtension, 'audio/mp4');
+    final path = await _uploadPrivate(
+      kVoiceMessagesBucket,
+      conversationId,
+      bytes,
+      fileExtension,
+      'audio/mp4',
+    );
     return UploadedChatMedia(mediaPath: path);
   }
 
   @override
-  Future<List<ChatMessage>> getMessages(String conversationId,
-      {int limit = 50}) async {
+  Future<List<ChatMessage>> getMessages(
+    String conversationId, {
+    int limit = 50,
+  }) async {
     final response = await _client
         .from('messages')
         .select()
@@ -313,9 +366,10 @@ class SupabaseChatRepository implements ChatRepository {
   Future<void> markAsRead(String messageId) async {
     final myId = _client.auth.currentUser!.id;
     try {
-      await _client
-          .from('message_reads')
-          .insert({'message_id': messageId, 'user_id': myId});
+      await _client.from('message_reads').insert({
+        'message_id': messageId,
+        'user_id': myId,
+      });
     } on sb.PostgrestException catch (e) {
       if (e.code != '23505') rethrow; // already marked read — no-op
     }
@@ -326,11 +380,13 @@ class SupabaseChatRepository implements ChatRepository {
     if (messageIds.isEmpty) return;
     final myId = _client.auth.currentUser!.id;
     final rows = [
-      for (final id in messageIds) {'message_id': id, 'user_id': myId}
+      for (final id in messageIds) {'message_id': id, 'user_id': myId},
     ];
     try {
       // Ignore rows that already exist (unique on message_id+user_id).
-      await _client.from('message_reads').upsert(
+      await _client
+          .from('message_reads')
+          .upsert(
             rows,
             onConflict: 'message_id,user_id',
             ignoreDuplicates: true,
@@ -341,7 +397,9 @@ class SupabaseChatRepository implements ChatRepository {
   }
 
   @override
-  Future<List<MessageReaction>> reactionsFor(Iterable<String> messageIds) async {
+  Future<List<MessageReaction>> reactionsFor(
+    Iterable<String> messageIds,
+  ) async {
     if (messageIds.isEmpty) return const [];
     final rows = await _client
         .from('message_reactions')
@@ -356,8 +414,11 @@ class SupabaseChatRepository implements ChatRepository {
   Future<void> addReaction(String messageId, String emoji) async {
     final myId = _client.auth.currentUser!.id;
     try {
-      await _client.from('message_reactions').insert(
-          {'message_id': messageId, 'user_id': myId, 'emoji': emoji});
+      await _client.from('message_reactions').insert({
+        'message_id': messageId,
+        'user_id': myId,
+        'emoji': emoji,
+      });
     } on sb.PostgrestException catch (e) {
       if (e.code != '23505') rethrow; // already reacted with this emoji
     }
@@ -383,7 +444,41 @@ class SupabaseChatRepository implements ChatRepository {
             column: 'conversation_id',
             value: conversationId,
           ),
-          callback: (payload) => onNewMessage(ChatMessage.fromJson(payload.newRecord)),
+          callback: (payload) =>
+              onNewMessage(ChatMessage.fromJson(payload.newRecord)),
+        )
+        .subscribe();
+  }
+
+  /// Realtime Broadcast (not Postgres Changes) — purely ephemeral, no table,
+  /// nothing persisted. One channel per conversation, shared by both
+  /// [broadcastTyping] and [subscribeToTyping].
+  String _typingChannelName(String conversationId) => 'typing:$conversationId';
+
+  @override
+  Future<void> broadcastTyping(String conversationId) async {
+    final myId = _client.auth.currentUser?.id;
+    if (myId == null) return;
+    await _client
+        .channel(_typingChannelName(conversationId))
+        .sendBroadcastMessage(event: 'typing', payload: {'user_id': myId});
+  }
+
+  @override
+  sb.RealtimeChannel subscribeToTyping(
+    String conversationId,
+    void Function() onTyping,
+  ) {
+    final myId = _client.auth.currentUser?.id;
+    return _client
+        .channel(_typingChannelName(conversationId))
+        .onBroadcast(
+          event: 'typing',
+          callback: (payload) {
+            // Broadcast delivers to every subscriber on the channel,
+            // including the sender — ignore our own typing echo.
+            if (payload['user_id'] != myId) onTyping();
+          },
         )
         .subscribe();
   }

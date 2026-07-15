@@ -6,6 +6,7 @@ import 'core/constants/app_constants.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_controller.dart';
+import 'features/calls/call_overlay.dart';
 
 /// Root widget: MaterialApp.router wired to go_router + brand theme.
 class LoveMeApp extends ConsumerWidget {
@@ -22,6 +23,10 @@ class LoveMeApp extends ConsumerWidget {
       darkTheme: AppTheme.dark(),
       themeMode: themeMode,
       routerConfig: router,
+      // Mounts the app-wide incoming-call listener + full-screen call surface
+      // above every route, so a call takes over regardless of the active tab.
+      builder: (context, child) =>
+          CallOverlay(child: child ?? const SizedBox()),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

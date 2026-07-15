@@ -1,6 +1,5 @@
 import '../models/device_session.dart';
 import '../models/profile.dart';
-import '../models/safety_report.dart';
 import '../models/subscription_plan.dart';
 
 /// In-memory sample data used by the whole front end during the mock-first
@@ -144,64 +143,60 @@ class MockData {
   ];
 
   /// Real 5 plan tiers, locked against the old app screenshots
-  /// (UI_REBUILD_PLAN.md §0.2). Free tier's profile limit is unconfirmed.
+  /// (UI_REBUILD_PLAN.md §0.2) + the real Google Play product IDs/limits
+  /// the user supplied 2026-07-15 (see `BACKEND_PAYMENTS_HANDOFF.md` §1).
+  /// Free tier's profile limit is unconfirmed.
   static const List<SubscriptionPlan> plans = [
     SubscriptionPlan(
-        id: 'basic_plus',
-        name: 'Basic+',
-        priceUsd: 5,
-        period: 'month',
-        badge: 'Silver',
-        profileLimit: 500),
-    SubscriptionPlan(
-        id: 'gold',
-        name: 'Gold',
-        priceUsd: 10,
-        period: 'month',
-        badge: 'Gold',
-        profileLimit: 1000,
-        popular: true),
-    SubscriptionPlan(
-        id: 'platinum',
-        name: 'Platinum',
-        priceUsd: 15,
-        period: 'month',
-        badge: 'Diamond',
-        profileLimit: 1500),
-    SubscriptionPlan(
-        id: 'premium_elite',
-        name: 'Premium Elite',
-        priceUsd: 20,
-        period: 'month',
-        badge: 'Crown',
-        profileLimit: 2000),
-    SubscriptionPlan(
-        id: 'vip_elite',
-        name: 'VIP Elite',
-        priceUsd: 25,
-        period: 'month',
-        badge: 'VIP',
-        profileLimit: null),
-  ];
-
-  /// Safety reports the user has submitted.
-  static final List<SafetyReport> reports = [
-    SafetyReport(
-      id: 'r1',
-      reportedName: 'Unknown user',
-      reason: 'Inappropriate photos',
-      status: ReportStatus.resolved,
-      createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      description: 'Profile had explicit images.',
-      adminResponse: 'Thanks — the account was removed.',
+      id: 'basic_plus',
+      name: 'Basic+',
+      priceUsd: 5,
+      period: 'month',
+      badge: 'Silver',
+      googlePlayProductId: 'basic_plus_monthly',
+      profileLimit: 500,
+      likesVisible: 500,
     ),
-    SafetyReport(
-      id: 'r2',
-      reportedName: 'Spam account',
-      reason: 'Spam / scam',
-      status: ReportStatus.pending,
-      createdAt: DateTime.now().subtract(const Duration(hours: 8)),
-      description: 'Kept sending payment links.',
+    SubscriptionPlan(
+      id: 'gold',
+      name: 'Gold',
+      priceUsd: 10,
+      period: 'month',
+      badge: 'Gold',
+      googlePlayProductId: 'gold_monthly',
+      profileLimit: 1000,
+      likesVisible: 1000,
+      popular: true,
+    ),
+    SubscriptionPlan(
+      id: 'platinum',
+      name: 'Platinum',
+      priceUsd: 15,
+      period: 'month',
+      badge: 'Diamond',
+      googlePlayProductId: 'platinum_monthly',
+      profileLimit: 1500,
+      likesVisible: 1500,
+    ),
+    SubscriptionPlan(
+      id: 'premium_elite',
+      name: 'Premium Elite',
+      priceUsd: 20,
+      period: 'month',
+      badge: 'Crown',
+      googlePlayProductId: 'premium_elite_monthly',
+      profileLimit: 2500,
+      likesVisible: 2500,
+    ),
+    SubscriptionPlan(
+      id: 'vip_elite',
+      name: 'VIP Elite',
+      priceUsd: 25,
+      period: 'month',
+      badge: 'VIP',
+      googlePlayProductId: 'vip_elite_monthly',
+      profileLimit: null,
+      likesVisible: null,
     ),
   ];
 

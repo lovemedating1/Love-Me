@@ -64,9 +64,9 @@ class PhotoPickCancelled implements Exception {
 /// offline first gate that rejects obviously non-person photos.
 class PhotoPickerService {
   PhotoPickerService({ImagePicker? picker, FaceDetector? faceDetector})
-      : _picker = picker ?? ImagePicker(),
-        _faceDetector = faceDetector ??
-            FaceDetector(options: FaceDetectorOptions());
+    : _picker = picker ?? ImagePicker(),
+      _faceDetector =
+          faceDetector ?? FaceDetector(options: FaceDetectorOptions());
 
   final ImagePicker _picker;
   final FaceDetector _faceDetector;
@@ -90,6 +90,26 @@ class PhotoPickerService {
     final bytes = await xfile.readAsBytes();
     final ext = _extensionOf(xfile.path);
     return PickedPhoto(bytes: bytes, fileExtension: ext);
+  }
+
+  /// Picks an identity-verification document photo (ID card/passport/etc.) —
+  /// no face-check, since a scanned document legitimately may not show a
+  /// clear face crop the on-device detector would recognize. Throws
+  /// [PhotoPickCancelled] if the user backs out.
+  Future<PickedPhoto> pickVerificationDocument(PhotoSource source) async {
+    final xfile = await _picker.pickImage(
+      source: source == PhotoSource.camera
+          ? ImageSource.camera
+          : ImageSource.gallery,
+      imageQuality: 90,
+      maxWidth: 2000,
+      maxHeight: 2000,
+    );
+    if (xfile == null) throw const PhotoPickCancelled();
+    return PickedPhoto(
+      bytes: await xfile.readAsBytes(),
+      fileExtension: _extensionOf(xfile.path),
+    );
   }
 
   /// Picks a chat image (no face-check — chat photos aren't required to be a

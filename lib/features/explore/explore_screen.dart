@@ -4,10 +4,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../shared/data/mock_data.dart';
+import '../../core/utils/country_flags.dart';
 import '../../shared/data/repositories.dart';
-import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/profile_preview_modal.dart';
+import '../../shared/widgets/profile_tile.dart';
 import '../../shared/widgets/state_views.dart';
 
 /// 09 — ExplorePage (tab body).
@@ -18,9 +18,11 @@ import '../../shared/widgets/state_views.dart';
 /// opens a user-list modal, and tapping a user opens the shared
 /// profile-preview modal instead of jumping straight to chat.
 ///
-/// Country counts come from `MockData.countries` — there is no
-/// `get_country_counts` RPC server-side yet ([BE-9]), so these are the same
-/// placeholder counts the mock feed has always used, not live data.
+/// Country counts come from [countryCountsProvider] — real
+/// `profiles_discoverable` rows grouped by country (client-side aggregate
+/// today; prefers the proposed `get_country_counts` RPC once backend ships
+/// it, see `BACKEND_BTIER_HANDOFF.md` §1). Only countries with at least one
+/// real user appear — no fabricated minimums.
 class ExploreScreen extends ConsumerStatefulWidget {
   const ExploreScreen({super.key});
 
@@ -41,27 +43,34 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final countries = MockData.countries
-        .where((c) => c.name.toLowerCase().contains(_query.toLowerCase()))
-        .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    final countsAsync = ref.watch(countryCountsProvider);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Text('Explore',
-            style: theme.textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w800)),
+        Text(
+          'Explore',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         const SizedBox(height: 4),
-        const Text('Discover people worldwide',
-            style: TextStyle(color: AppColors.mutedFg)),
+        const Text(
+          'Discover people worldwide',
+          style: TextStyle(color: AppColors.mutedFg),
+        ),
         const SizedBox(height: 6),
         const Row(
           children: [
             Icon(LucideIcons.globe, size: 16, color: AppColors.pink),
             SizedBox(width: 6),
-            Text('Browse by Country',
-                style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.pink)),
+            Text(
+              'Browse by Country',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.pink,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -74,80 +83,113 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        if (countries.isEmpty)
-          const Padding(
+        countsAsync.when(
+          loading: () => const Padding(
             padding: EdgeInsets.only(top: 40),
-            child: EmptyView(
-                icon: LucideIcons.globe, message: 'No countries match your search.'),
-          )
-        else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.95,
-            ),
-            itemCount: countries.length,
-            itemBuilder: (_, i) => _countryCard(context, countries[i]),
+            child: Center(child: CircularProgressIndicator()),
           ),
+          error: (_, _) => Padding(
+            padding: const EdgeInsets.only(top: 40),
+            child: ErrorView(
+              message: 'Could not load countries.',
+              onRetry: () => ref.invalidate(countryCountsProvider),
+            ),
+          ),
+          data: (counts) {
+            final countries =
+                counts.entries
+                    .where(
+                      (e) => e.key.toLowerCase().contains(_query.toLowerCase()),
+                    )
+                    .toList()
+                  ..sort((a, b) => a.key.compareTo(b.key));
+
+            if (countries.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.only(top: 40),
+                child: EmptyView(
+                  icon: LucideIcons.globe,
+                  message: 'No countries match your search.',
+                ),
+              );
+            }
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.95,
+              ),
+              itemCount: countries.length,
+              itemBuilder: (_, i) =>
+                  _countryCard(context, countries[i].key, countries[i].value),
+            );
+          },
+        ),
       ],
     );
   }
 
-  Widget _countryCard(BuildContext context, ({String flag, String name, int count}) c) =>
-      Material(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
+  Widget _countryCard(BuildContext context, String name, int count) => Material(
+    color: Theme.of(context).colorScheme.surface,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => _openCountry(context, name, count),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => _openCountry(context, c),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: AppTheme.cardShadow,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(c.flag, style: const TextStyle(fontSize: 30)),
-                const SizedBox(height: 8),
-                Text(c.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                const SizedBox(height: 2),
-                Text('${c.count} users',
-                    style: const TextStyle(color: AppColors.mutedFg, fontSize: 11)),
-              ],
-            ),
-          ),
+          boxShadow: AppTheme.cardShadow,
         ),
-      );
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              CountryFlags.forCountry(name),
+              style: const TextStyle(fontSize: 30),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '$count users',
+              style: const TextStyle(color: AppColors.mutedFg, fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
-  void _openCountry(BuildContext context, ({String flag, String name, int count}) c) {
+  void _openCountry(BuildContext context, String name, int count) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _CountryUsersSheet(country: c),
+      builder: (_) => _CountryUsersSheet(countryName: name, count: count),
     );
   }
 }
 
 class _CountryUsersSheet extends ConsumerWidget {
-  const _CountryUsersSheet({required this.country});
+  const _CountryUsersSheet({required this.countryName, required this.count});
 
-  final ({String flag, String name, int count}) country;
+  final String countryName;
+  final int count;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final people = ref.watch(profilesByCountryProvider(country.name));
+    final people = ref.watch(profilesByCountryProvider(countryName));
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.75,
       child: Column(
@@ -156,12 +198,18 @@ class _CountryUsersSheet extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
             child: Row(
               children: [
-                Text(country.flag, style: const TextStyle(fontSize: 28)),
+                Text(
+                  CountryFlags.forCountry(countryName),
+                  style: const TextStyle(fontSize: 28),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text('${country.name} (${country.count} users)',
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  child: Text(
+                    '$countryName ($count users)',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(LucideIcons.x),
@@ -174,26 +222,30 @@ class _CountryUsersSheet extends ConsumerWidget {
             child: people.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, _) => ErrorView(
-                  message: 'Could not load profiles.',
-                  onRetry: () => ref.invalidate(profilesByCountryProvider(country.name))),
+                message: 'Could not load profiles.',
+                onRetry: () =>
+                    ref.invalidate(profilesByCountryProvider(countryName)),
+              ),
               data: (list) {
                 if (list.isEmpty) {
                   return EmptyView(
-                      icon: LucideIcons.globe,
-                      message: 'No users in ${country.name} yet.');
+                    icon: LucideIcons.globe,
+                    message: 'No users in $countryName yet.',
+                  );
                 }
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                return GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.78,
+                  ),
                   itemCount: list.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (_, i) {
                     final p = list[i];
-                    return ListTile(
-                      leading: AppAvatar(photoUrl: p.photoUrl, size: 44, isVerified: p.isVerified),
-                      title: Text(p.name),
-                      subtitle: Text('${p.city}, ${p.country}'),
-                      trailing: Text(p.ageLabel,
-                          style: const TextStyle(color: AppColors.mutedFg)),
+                    return ProfileTile(
+                      profile: p,
                       onTap: () {
                         Navigator.of(context).pop();
                         ProfilePreviewModal.show(context, p);

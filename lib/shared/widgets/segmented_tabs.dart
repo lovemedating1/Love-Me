@@ -62,9 +62,10 @@ class SegmentedTabs extends StatelessWidget {
           boxShadow: selected
               ? const [
                   BoxShadow(
-                      color: Color(0x11000000),
-                      blurRadius: 8,
-                      offset: Offset(0, 2))
+                    color: Color(0x11000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
                 ]
               : null,
         ),
@@ -86,14 +87,17 @@ class SegmentedTabs extends StatelessWidget {
                 padding: const EdgeInsets.all(5),
                 constraints: const BoxConstraints(minWidth: 22),
                 decoration: const BoxDecoration(
-                    color: AppColors.pink, shape: BoxShape.circle),
+                  color: AppColors.pink,
+                  shape: BoxShape.circle,
+                ),
                 child: Text(
                   '${tab.badgeCount}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700),
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],

@@ -3,10 +3,19 @@ import 'package:equatable/equatable.dart';
 /// Cross-feature user profile model — mirrors the live `profiles` table
 /// (migration 001_auth_profiles.sql) for the columns that exist there.
 ///
-/// Fields marked "local-only" below (bio, gallery, interests, isPremium,
-/// isOnline) are NOT yet backed by a column/table in the live schema. They
-/// default to empty/false and are not sent to Supabase until their backing
-/// columns/tables ship — see `app doctumant/migration_001.md`.
+/// `bio`/`interests`/`occupation` are read/written against the proposed
+/// `profiles.bio`/`profiles.interests`/`profiles.occupation` columns (see
+/// `BACKEND_BTIER_HANDOFF.md` §4, [BE-13]) — they round-trip through
+/// [fromJson]/[toInsertJson] like any other real field, but those columns
+/// don't exist server-side yet, so writes/reads are silently no-ops
+/// (`fromJson` reads `null`/empty, `toInsertJson`'s `update()` call just
+/// won't find the column) until backend ships them.
+///
+/// Fields marked "local-only" below (gallery, isPremium, isOnline) are NOT
+/// backed by a column/table in the live schema at all (superseded by
+/// `profile_photos`, deferred to the final payments tier, and read
+/// separately via `presenceForProvider` respectively) — they default to
+/// empty/false and are never sent to Supabase.
 class Profile extends Equatable {
   const Profile({
     required this.userId,
@@ -30,11 +39,13 @@ class Profile extends Equatable {
     this.profileComplete = false,
     this.isPremium = false,
     this.premiumUntil,
+    this.planId,
     this.ringtone = '',
-    // Local-only (no backing column/table yet):
-    this.gallery = const [],
     this.bio,
     this.interests = const [],
+    this.occupation,
+    // Local-only (no backing column/table at all):
+    this.gallery = const [],
     this.isOnline = false,
   });
 
@@ -69,6 +80,14 @@ class Profile extends Equatable {
   /// showing a fabricated number.
   final DateTime? premiumUntil;
 
+  /// Which of the 5 locked plan tiers (`SubscriptionPlan.id`) the user is
+  /// currently on — read/written against the proposed `profiles.plan_id`
+  /// column (see `BACKEND_PAYMENTS_HANDOFF.md` §3). `null` when free/no
+  /// active plan, or when the column doesn't exist server-side yet
+  /// (read-only from the client; a real purchase sets this server-side via
+  /// `verify-purchase`, never a direct client PATCH).
+  final String? planId;
+
   final String ringtone;
 
   /// Whole days until [premiumUntil], or `null` when unknown/expired.
@@ -79,10 +98,12 @@ class Profile extends Equatable {
     return days < 0 ? null : days;
   }
 
-  // Local-only fields (see class doc).
-  final List<String> gallery;
   final String? bio;
   final List<String> interests;
+  final String? occupation;
+
+  // Local-only fields (see class doc) — no backing column/table at all.
+  final List<String> gallery;
   final bool isOnline;
 
   /// Computed from [birthday] — the `profiles` table has no `age` column.
@@ -126,34 +147,43 @@ class Profile extends Equatable {
       premiumUntil: json['premium_until'] == null
           ? null
           : DateTime.parse(json['premium_until'] as String),
+      planId: json['plan_id'] as String?,
       ringtone: json['ringtone'] as String? ?? '',
+      bio: json['bio'] as String?,
+      interests:
+          (json['interests'] as List<dynamic>?)?.cast<String>() ?? const [],
+      occupation: json['occupation'] as String?,
     );
   }
 
   /// Wire shape for POST/PATCH `/rest/v1/profiles`. Only includes columns
-  /// that exist in the live table.
+  /// that exist in the live table (`bio`/`interests`/`occupation` are
+  /// proposed, not yet live — see class doc).
   Map<String, dynamic> toInsertJson() => {
-        'user_id': userId,
-        'name': name,
-        'city': city,
-        'country': country,
-        if (birthday != null)
-          'birthday':
-              '${birthday!.year.toString().padLeft(4, '0')}-${birthday!.month.toString().padLeft(2, '0')}-${birthday!.day.toString().padLeft(2, '0')}',
-        if (gender != null) 'gender': gender,
-        if (orientation != null) 'orientation': orientation,
-        if (interestedIn != null) 'interested_in': interestedIn,
-        if (maritalStatus != null) 'marital_status': maritalStatus,
-        if (relationshipGoal != null) 'relationship_goal': relationshipGoal,
-        'hobbies': hobbies,
-        'distance_preference_km': distancePreferenceKm,
-        if (locationLat != null) 'location_lat': locationLat,
-        if (locationLng != null) 'location_lng': locationLng,
-        if (locationAccuracyM != null) 'location_accuracy_m': locationAccuracyM,
-        if (photoUrl != null) 'photo_url': photoUrl,
-        'ringtone': ringtone,
-        'profile_complete': profileComplete,
-      };
+    'user_id': userId,
+    'name': name,
+    'city': city,
+    'country': country,
+    if (birthday != null)
+      'birthday':
+          '${birthday!.year.toString().padLeft(4, '0')}-${birthday!.month.toString().padLeft(2, '0')}-${birthday!.day.toString().padLeft(2, '0')}',
+    if (gender != null) 'gender': gender,
+    if (orientation != null) 'orientation': orientation,
+    if (interestedIn != null) 'interested_in': interestedIn,
+    if (maritalStatus != null) 'marital_status': maritalStatus,
+    if (relationshipGoal != null) 'relationship_goal': relationshipGoal,
+    'hobbies': hobbies,
+    'distance_preference_km': distancePreferenceKm,
+    if (locationLat != null) 'location_lat': locationLat,
+    if (locationLng != null) 'location_lng': locationLng,
+    if (locationAccuracyM != null) 'location_accuracy_m': locationAccuracyM,
+    if (photoUrl != null) 'photo_url': photoUrl,
+    'ringtone': ringtone,
+    'profile_complete': profileComplete,
+    if (bio != null) 'bio': bio,
+    'interests': interests,
+    if (occupation != null) 'occupation': occupation,
+  };
 
   Profile copyWith({
     String? name,
@@ -176,10 +206,12 @@ class Profile extends Equatable {
     bool? profileComplete,
     bool? isPremium,
     DateTime? premiumUntil,
+    String? planId,
     String? ringtone,
     List<String>? gallery,
     String? bio,
     List<String>? interests,
+    String? occupation,
     bool? isOnline,
   }) {
     return Profile(
@@ -204,10 +236,12 @@ class Profile extends Equatable {
       profileComplete: profileComplete ?? this.profileComplete,
       isPremium: isPremium ?? this.isPremium,
       premiumUntil: premiumUntil ?? this.premiumUntil,
+      planId: planId ?? this.planId,
       ringtone: ringtone ?? this.ringtone,
       gallery: gallery ?? this.gallery,
       bio: bio ?? this.bio,
       interests: interests ?? this.interests,
+      occupation: occupation ?? this.occupation,
       isOnline: isOnline ?? this.isOnline,
     );
   }

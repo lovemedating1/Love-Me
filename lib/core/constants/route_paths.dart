@@ -22,6 +22,7 @@ class RoutePaths {
   static const String devices = '/devices';
   static const String subscription = '/subscription';
   static const String safetyReports = '/safety-reports';
+  static const String blockedUsers = '/blocked-users';
   static const String deleteAccount = '/delete-account';
 
   // Legal

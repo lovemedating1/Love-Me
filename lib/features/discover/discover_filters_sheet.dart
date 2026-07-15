@@ -12,11 +12,11 @@ class DiscoverFiltersSheet extends ConsumerStatefulWidget {
   const DiscoverFiltersSheet({super.key});
 
   static Future<void> show(BuildContext context) => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => const DiscoverFiltersSheet(),
-      );
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => const DiscoverFiltersSheet(),
+  );
 
   @override
   ConsumerState<DiscoverFiltersSheet> createState() =>
@@ -50,8 +50,10 @@ class _DiscoverFiltersSheetState extends ConsumerState<DiscoverFiltersSheet> {
           const SizedBox(height: 16),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('🌍 Worldwide',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            title: const Text(
+              '🌍 Worldwide',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             subtitle: const Text('See profiles from anywhere in the world'),
             value: _worldwide,
             onChanged: (v) => setState(() => _worldwide = v),
@@ -61,8 +63,10 @@ class _DiscoverFiltersSheetState extends ConsumerState<DiscoverFiltersSheet> {
             Center(
               child: Text(
                 '$_radiusKm km',
-                style: theme.textTheme.headlineMedium
-                    ?.copyWith(fontWeight: FontWeight.w800, color: AppColors.pink),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.pink,
+                ),
               ),
             ),
             Slider(

@@ -12,6 +12,13 @@ enum MessageStatus { sending, sent, delivered, read, failed }
 /// - Media types require [mediaUrl] and must NOT set [message].
 /// - [MessageType.video] additionally requires [thumbnailUrl].
 /// - `location` has no lat/lng columns yet — don't build against it.
+///
+/// [senderId] is nullable as of `034_messages_sender_id_nullable.sql`
+/// (backend, 2026-07-14): `delete-account` anonymizes a deleted user's sent
+/// messages by nulling `sender_id` rather than deleting the row, so the
+/// other participant keeps their conversation history. A `null` sender is a
+/// real, reachable state for any conversation where the other person
+/// deleted their account — see `Safety.Trust Backend.md` §3.
 class ChatMessage extends Equatable {
   const ChatMessage({
     required this.id,
@@ -33,7 +40,9 @@ class ChatMessage extends Equatable {
 
   final String id;
   final String conversationId;
-  final String senderId;
+
+  /// `null` when the sender's account has since been deleted (see class doc).
+  final String? senderId;
   final MessageType messageType;
   final String? message;
   final String? mediaUrl;
@@ -48,30 +57,37 @@ class ChatMessage extends Equatable {
   final DateTime updatedAt;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
-        id: json['id'] as String,
-        conversationId: json['conversation_id'] as String,
-        senderId: json['sender_id'] as String,
-        messageType: MessageType.values.byName(json['message_type'] as String),
-        message: json['message'] as String?,
-        mediaUrl: json['media_url'] as String?,
-        thumbnailUrl: json['thumbnail_url'] as String?,
-        replyToMessageId: json['reply_to_message_id'] as String?,
-        status: MessageStatus.values.byName(json['status'] as String),
-        isEdited: json['is_edited'] as bool? ?? false,
-        editedAt: json['edited_at'] == null
-            ? null
-            : DateTime.parse(json['edited_at'] as String),
-        isDeleted: json['is_deleted'] as bool? ?? false,
-        deletedAt: json['deleted_at'] == null
-            ? null
-            : DateTime.parse(json['deleted_at'] as String),
-        createdAt: DateTime.parse(json['created_at'] as String),
-        updatedAt: DateTime.parse(json['updated_at'] as String),
-      );
+    id: json['id'] as String,
+    conversationId: json['conversation_id'] as String,
+    senderId: json['sender_id'] as String?,
+    messageType: MessageType.values.byName(json['message_type'] as String),
+    message: json['message'] as String?,
+    mediaUrl: json['media_url'] as String?,
+    thumbnailUrl: json['thumbnail_url'] as String?,
+    replyToMessageId: json['reply_to_message_id'] as String?,
+    status: MessageStatus.values.byName(json['status'] as String),
+    isEdited: json['is_edited'] as bool? ?? false,
+    editedAt: json['edited_at'] == null
+        ? null
+        : DateTime.parse(json['edited_at'] as String),
+    isDeleted: json['is_deleted'] as bool? ?? false,
+    deletedAt: json['deleted_at'] == null
+        ? null
+        : DateTime.parse(json['deleted_at'] as String),
+    createdAt: DateTime.parse(json['created_at'] as String),
+    updatedAt: DateTime.parse(json['updated_at'] as String),
+  );
 
-  bool isMine(String myUserId) => senderId == myUserId;
+  bool isMine(String myUserId) => senderId != null && senderId == myUserId;
 
   @override
-  List<Object?> get props =>
-      [id, conversationId, senderId, message, isEdited, isDeleted, status];
+  List<Object?> get props => [
+    id,
+    conversationId,
+    senderId,
+    message,
+    isEdited,
+    isDeleted,
+    status,
+  ];
 }

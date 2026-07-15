@@ -38,16 +38,16 @@ class SupabaseMatchRepository implements MatchRepository {
   }
 
   @override
-  Future<void> unmatch(String matchId) => _client
-      .from('matches')
-      .update({'status': 'unmatched'}).eq('id', matchId);
+  Future<void> unmatch(String matchId) =>
+      _client.from('matches').update({'status': 'unmatched'}).eq('id', matchId);
 
   @override
   Future<void> block(String matchId) {
     final myId = _client.auth.currentUser!.id;
     return _client
         .from('matches')
-        .update({'status': 'blocked', 'blocked_by': myId}).eq('id', matchId);
+        .update({'status': 'blocked', 'blocked_by': myId})
+        .eq('id', matchId);
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../core/config/agora_config.dart';
 import '../../core/constants/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -13,6 +14,7 @@ import '../../shared/models/profile.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/segmented_tabs.dart';
 import '../../shared/widgets/state_views.dart';
+import '../calls/call_controller.dart';
 
 /// 08 — MessagesPage (tab body).
 ///
@@ -38,17 +40,20 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
   @override
   Widget build(BuildContext context) {
     final convos = ref.watch(conversationsProvider).valueOrNull ?? const [];
-    final chatCount = convos.where((c) => !_deleted.contains(c.partner.userId)).length;
+    final chatCount = convos
+        .where((c) => !_deleted.contains(c.partner.userId))
+        .length;
 
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text('Messages and Calls',
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w800)),
+          child: Text(
+            'Messages and Calls',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -80,14 +85,17 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
       loading: () => ListView(
         padding: const EdgeInsets.all(16),
         children: List.generate(
-            5, (_) => const Padding(
-                  padding: EdgeInsets.only(bottom: 10),
-                  child: SkeletonBox(height: 66, radius: 16),
-                )),
+          5,
+          (_) => const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: SkeletonBox(height: 66, radius: 16),
+          ),
+        ),
       ),
       error: (_, _) => ErrorView(
-          message: 'Could not load calls.',
-          onRetry: () => ref.invalidate(callHistoryProvider)),
+        message: 'Could not load calls.',
+        onRetry: () => ref.invalidate(callHistoryProvider),
+      ),
       data: (list) {
         if (list.isEmpty) {
           return const Padding(
@@ -96,11 +104,15 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               children: [
                 Text('📞', style: TextStyle(fontSize: 48)),
                 SizedBox(height: 12),
-                Text('No calls yet',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                Text(
+                  'No calls yet',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
                 SizedBox(height: 4),
-                Text('Start a voice or video call from any chat',
-                    style: TextStyle(color: AppColors.mutedFg)),
+                Text(
+                  'Start a voice or video call from any chat',
+                  style: TextStyle(color: AppColors.mutedFg),
+                ),
               ],
             ),
           );
@@ -116,7 +128,9 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             itemBuilder: (_, i) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _callCard(
-                  list[i], partnerByConversation[list[i].conversationId]),
+                list[i],
+                partnerByConversation[list[i].conversationId],
+              ),
             ),
           ),
         );
@@ -128,7 +142,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final theme = Theme.of(context);
     final myId = ref.watch(currentUserProvider).valueOrNull?.userId;
     final outgoing = myId != null && call.callerId == myId;
-    final missed = call.callStatus == CallStatus.missed ||
+    final missed =
+        call.callStatus == CallStatus.missed ||
         call.callStatus == CallStatus.declined;
 
     final (icon, color) = switch ((missed, outgoing)) {
@@ -144,27 +159,40 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         boxShadow: AppTheme.cardShadow,
       ),
       child: ListTile(
+        onTap: partner == null ? null : () => _callBack(call, partner),
         leading: AppAvatar(photoUrl: partner?.photoUrl, size: 46),
-        title: Text(partner?.name ?? 'Unknown',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+        title: Text(
+          partner?.name ?? 'Unknown',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         subtitle: Row(
           children: [
             Icon(icon, size: 14, color: color),
             const SizedBox(width: 6),
             Icon(
-                call.callType == CallType.video ? LucideIcons.video : LucideIcons.phone,
-                size: 14,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+              call.callType == CallType.video
+                  ? LucideIcons.video
+                  : LucideIcons.phone,
+              size: 14,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
             const SizedBox(width: 6),
             Expanded(
-              child: Text(_callSubtitle(call, missed),
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall),
+              child: Text(
+                _callSubtitle(call, missed),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall,
+              ),
             ),
           ],
         ),
-        trailing: Text(RelativeTime.short(call.startedAt),
-            style: theme.textTheme.labelSmall),
+        trailing: Text(
+          RelativeTime.short(call.startedAt),
+          style: theme.textTheme.labelSmall,
+        ),
       ),
     );
   }
@@ -176,6 +204,31 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final m = secs ~/ 60;
     final s = secs % 60;
     return m > 0 ? '${m}m ${s}s' : '${s}s';
+  }
+
+  /// Re-initiate a call of the same type from a history row. The
+  /// [CallOverlay] takes over the screen off the controller state.
+  Future<void> _callBack(CallLog call, Profile partner) async {
+    if (!AgoraConfig.isConfigured) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Calling is not available in this build.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      return;
+    }
+    await ref
+        .read(callControllerProvider.notifier)
+        .placeCall(
+          conversationId: call.conversationId,
+          partnerId: partner.userId,
+          partnerName: partner.name,
+          partnerPhotoUrl: partner.photoUrl,
+          video: call.callType == CallType.video,
+        );
   }
 
   Widget _chatsTab() {
@@ -198,24 +251,31 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
             loading: () => ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: List.generate(
-                  6, (_) => const Padding(
-                        padding: EdgeInsets.only(bottom: 10),
-                        child: SkeletonBox(height: 74, radius: 16),
-                      )),
+                6,
+                (_) => const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: SkeletonBox(height: 74, radius: 16),
+                ),
+              ),
             ),
             error: (_, _) => ErrorView(
-                message: 'Could not load chats.',
-                onRetry: () => ref.invalidate(conversationsProvider)),
+              message: 'Could not load chats.',
+              onRetry: () => ref.invalidate(conversationsProvider),
+            ),
             data: (all) {
               final list = all
-                  .where((c) =>
-                      !_deleted.contains(c.partner.userId) &&
-                      c.partner.name.toLowerCase().contains(_query))
+                  .where(
+                    (c) =>
+                        !_deleted.contains(c.partner.userId) &&
+                        c.partner.name.toLowerCase().contains(_query),
+                  )
                   .toList();
               if (list.isEmpty) {
                 return const EmptyView(
-                    icon: LucideIcons.messageCircle,
-                    message: 'No conversations yet — start chatting from Discover.');
+                  icon: LucideIcons.messageCircle,
+                  message:
+                      'No conversations yet — start chatting from Discover.',
+                );
               }
               return ListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -255,7 +315,9 @@ class _ChatRowState extends State<_ChatRow> {
   void _toast(BuildContext context, String msg) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating));
+      ..showSnackBar(
+        SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+      );
   }
 
   @override
@@ -282,24 +344,34 @@ class _ChatRowState extends State<_ChatRow> {
               isOnline: partner.isOnline,
               isVerified: partner.isVerified,
             ),
-            title: Text(partner.name,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            subtitle: Text(c.lastMessageText ?? 'Say hi 👋',
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+            title: Text(
+              partner.name,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              c.lastMessageText ?? 'Say hi 👋',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             trailing: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (c.lastMessageAt != null)
-                  Text(RelativeTime.short(c.lastMessageAt!),
-                      style: theme.textTheme.labelSmall),
+                  Text(
+                    RelativeTime.short(c.lastMessageAt!),
+                    style: theme.textTheme.labelSmall,
+                  ),
                 const SizedBox(height: 2),
                 GestureDetector(
                   onTap: () => setState(() => _expanded = !_expanded),
                   child: Icon(
-                      _expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
-                      size: 16),
+                    _expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+                    size: 16,
+                  ),
                 ),
               ],
             ),
@@ -314,7 +386,8 @@ class _ChatRowState extends State<_ChatRow> {
                       icon: LucideIcons.bellOff,
                       label: 'Mute',
                       // No `muted` column on `conversations` yet — [BE-11].
-                      onTap: () => _toast(context, 'Mute isn\'t available yet.'),
+                      onTap: () =>
+                          _toast(context, 'Mute isn\'t available yet.'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -323,7 +396,8 @@ class _ChatRowState extends State<_ChatRow> {
                       icon: LucideIcons.archive,
                       label: 'Archive',
                       // No `archived` column on `conversations` yet — [BE-11].
-                      onTap: () => _toast(context, 'Archive isn\'t available yet.'),
+                      onTap: () =>
+                          _toast(context, 'Archive isn\'t available yet.'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -352,23 +426,22 @@ class _ChatRowState extends State<_ChatRow> {
     required String label,
     required VoidCallback onTap,
     Color color = AppColors.mutedFg,
-  }) =>
-      Material(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              children: [
-                Icon(icon, size: 18, color: color),
-                const SizedBox(height: 2),
-                Text(label, style: TextStyle(fontSize: 11, color: color)),
-              ],
-            ),
-          ),
+  }) => Material(
+    color: color.withValues(alpha: 0.1),
+    borderRadius: BorderRadius.circular(12),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 11, color: color)),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }

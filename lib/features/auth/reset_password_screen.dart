@@ -34,13 +34,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await Supabase.instance.client.auth
-          .updateUser(UserAttributes(password: _pwd.text));
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: _pwd.text),
+      );
       if (mounted) setState(() => _done = true);
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message), backgroundColor: AppColors.destructive));
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: AppColors.destructive,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -66,8 +71,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text('Choose a new password',
-                              style: theme.textTheme.titleLarge),
+                          Text(
+                            'Choose a new password',
+                            style: theme.textTheme.titleLarge,
+                          ),
                           const SizedBox(height: 20),
                           TextFormField(
                             controller: _pwd,
@@ -79,9 +86,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               labelText: 'New password',
                               prefixIcon: const Icon(LucideIcons.lock),
                               suffixIcon: IconButton(
-                                icon: Icon(_obscure
-                                    ? LucideIcons.eye
-                                    : LucideIcons.eyeOff),
+                                icon: Icon(
+                                  _obscure
+                                      ? LucideIcons.eye
+                                      : LucideIcons.eyeOff,
+                                ),
                                 onPressed: () =>
                                     setState(() => _obscure = !_obscure),
                               ),
@@ -108,7 +117,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white))
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
                                 : const Text('Update password'),
                           ),
                         ],
@@ -122,20 +134,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   Widget _success(ThemeData theme) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(LucideIcons.circleCheck,
-              color: AppColors.success, size: 56),
-          const SizedBox(height: 16),
-          Text('Password updated', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => context.go(RoutePaths.auth),
-              child: const Text('Go to sign in'),
-            ),
-          ),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const Icon(LucideIcons.circleCheck, color: AppColors.success, size: 56),
+      const SizedBox(height: 16),
+      Text('Password updated', style: theme.textTheme.titleLarge),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: FilledButton(
+          onPressed: () => context.go(RoutePaths.auth),
+          child: const Text('Go to sign in'),
+        ),
+      ),
+    ],
+  );
 }

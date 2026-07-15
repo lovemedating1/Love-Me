@@ -10,7 +10,7 @@ import 'photo_picker_service.dart' show RecordedVoice;
 /// upload. Wraps the stateful `record` recorder (start → stop → read).
 class VoiceRecorderService {
   VoiceRecorderService({AudioRecorder? recorder})
-      : _recorder = recorder ?? AudioRecorder();
+    : _recorder = recorder ?? AudioRecorder();
 
   final AudioRecorder _recorder;
   String? _path;

@@ -15,12 +15,11 @@ class MessageRead extends Equatable {
   final DateTime readAt;
 
   factory MessageRead.fromJson(Map<String, dynamic> json) => MessageRead(
-        id: json['id'] as String,
-        messageId: json['message_id'] as String,
-        userId: json['user_id'] as String,
-        readAt: DateTime.parse(
-            (json['read_at'] ?? json['created_at']) as String),
-      );
+    id: json['id'] as String,
+    messageId: json['message_id'] as String,
+    userId: json['user_id'] as String,
+    readAt: DateTime.parse((json['read_at'] ?? json['created_at']) as String),
+  );
 
   @override
   List<Object?> get props => [id, messageId, userId];

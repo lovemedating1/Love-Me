@@ -158,15 +158,18 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
           child: Container(
             padding: const EdgeInsets.all(4),
             constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-            decoration:
-                const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: AppColors.gold,
+              shape: BoxShape.circle,
+            ),
             child: Text(
               notificationCount > 99 ? '99+' : '$notificationCount',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                  color: Color(0xFF2B2B2B),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700),
+                color: Color(0xFF2B2B2B),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -262,9 +265,10 @@ class HeaderAction extends StatelessWidget {
                 badgeCount > 99 ? '99+' : '$badgeCount',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    color: Color(0xFF2B2B2B),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700),
+                  color: Color(0xFF2B2B2B),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),

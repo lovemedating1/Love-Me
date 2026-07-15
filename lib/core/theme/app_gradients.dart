@@ -41,8 +41,6 @@ class AppGradients {
     colors: [AppColors.pink, AppColors.orange],
   );
 
-
-
   /// Animated VIP tier label (use with a shimmer/animation later).
   static const LinearGradient vip = LinearGradient(
     begin: Alignment(-1, 0),

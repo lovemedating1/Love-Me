@@ -31,7 +31,8 @@ class Validators {
 
   static String? displayName(String? v) {
     final t = v?.trim() ?? '';
-    if (t.length < 2 || t.length > 30) return 'Enter your first name (2-30 chars)';
+    if (t.length < 2 || t.length > 30)
+      return 'Enter your first name (2-30 chars)';
     return null;
   }
 

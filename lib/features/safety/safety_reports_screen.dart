@@ -20,12 +20,15 @@ class SafetyReportsScreen extends ConsumerWidget {
       body: reports.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => ErrorView(
-            message: 'Could not load reports.',
-            onRetry: () => ref.invalidate(safetyReportsProvider)),
+          message: 'Could not load reports.',
+          onRetry: () => ref.invalidate(safetyReportsProvider),
+        ),
         data: (list) {
           if (list.isEmpty) {
             return const EmptyView(
-                icon: LucideIcons.shield, message: 'No reports submitted.');
+              icon: LucideIcons.shield,
+              message: 'No reports submitted.',
+            );
           }
           return ListView.builder(
             padding: const EdgeInsets.all(12),
@@ -43,11 +46,15 @@ class SafetyReportsScreen extends ConsumerWidget {
       child: ListTile(
         onTap: () => _detail(context, r),
         leading: const Icon(LucideIcons.flag),
-        title: Text(r.reason,
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        title: Text(
+          r.reason,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         subtitle: Text(
-            'Reported ${r.reportedName} · ${RelativeTime.short(r.createdAt)}'),
+          'Reported ${r.reportedName} · ${RelativeTime.short(r.createdAt)}',
+        ),
         trailing: _statusBadge(r.status),
       ),
     );
@@ -62,10 +69,17 @@ class SafetyReportsScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(999)),
-      child: Text(label,
-          style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 
@@ -84,15 +98,19 @@ class SafetyReportsScreen extends ConsumerWidget {
             _statusBadge(r.status),
             const SizedBox(height: 16),
             if (r.description != null) ...[
-              const Text('Your report',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text(
+                'Your report',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 4),
               Text(r.description!),
               const SizedBox(height: 16),
             ],
             if (r.adminResponse != null) ...[
-              const Text('Trust & Safety response',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text(
+                'Trust & Safety response',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 4),
               Text(r.adminResponse!),
             ],

@@ -72,17 +72,21 @@ class SupabaseConversationRepository implements ConversationRepository {
         .map((c) => matchByid[c.matchId]?.otherUserId(myId))
         .whereType<String>()
         .toList();
-    final profileRows =
-        await _client.from('profiles').select().inFilter('user_id', otherIds);
+    final profileRows = await _client
+        .from('profiles')
+        .select()
+        .inFilter('user_id', otherIds);
     final profilesById = {
       for (final p in (profileRows as List))
-        (p as Map<String, dynamic>)['user_id'] as String: Profile.fromJson(p)
+        (p as Map<String, dynamic>)['user_id'] as String: Profile.fromJson(p),
     };
 
     final summaries = <ConversationSummary>[];
     for (final convo in conversations) {
       final match = matchByid[convo.matchId];
-      final partner = match == null ? null : profilesById[match.otherUserId(myId)];
+      final partner = match == null
+          ? null
+          : profilesById[match.otherUserId(myId)];
       if (partner == null) continue;
 
       final lastMessage = await _client
@@ -94,14 +98,16 @@ class SupabaseConversationRepository implements ConversationRepository {
           .limit(1)
           .maybeSingle();
 
-      summaries.add(ConversationSummary(
-        conversation: convo,
-        partner: partner,
-        lastMessageText: lastMessage?['message'] as String?,
-        lastMessageAt: lastMessage?['created_at'] == null
-            ? null
-            : DateTime.parse(lastMessage!['created_at'] as String),
-      ));
+      summaries.add(
+        ConversationSummary(
+          conversation: convo,
+          partner: partner,
+          lastMessageText: lastMessage?['message'] as String?,
+          lastMessageAt: lastMessage?['created_at'] == null
+              ? null
+              : DateTime.parse(lastMessage!['created_at'] as String),
+        ),
+      );
     }
 
     summaries.sort((a, b) {
@@ -117,9 +123,9 @@ class SupabaseConversationRepository implements ConversationRepository {
     final myId = _client.auth.currentUser!.id;
     final matches = await matchRepository.myMatches();
     final match = matches.cast<Match?>().firstWhere(
-          (m) => m != null && m.otherUserId(myId) == partnerUserId,
-          orElse: () => null,
-        );
+      (m) => m != null && m.otherUserId(myId) == partnerUserId,
+      orElse: () => null,
+    );
     if (match == null) return null;
 
     final row = await _client

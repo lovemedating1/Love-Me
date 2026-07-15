@@ -10,6 +10,8 @@ import '../../shared/data/repositories.dart';
 import '../../shared/models/profile.dart';
 import '../../shared/widgets/app_chip.dart';
 import '../../shared/widgets/info_modals.dart';
+import '../../shared/widgets/profile_preview_modal.dart';
+import '../../shared/widgets/report_user_sheet.dart';
 import '../../shared/widgets/state_views.dart';
 import 'discover_filters_sheet.dart';
 import 'discover_providers.dart';
@@ -41,11 +43,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   void _toast(String msg) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(msg),
-        backgroundColor: AppColors.pink,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: AppColors.pink,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   Future<void> _pass(Profile p) async {
@@ -70,6 +74,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     try {
       await ref.read(swipeRepositoryProvider).likeProfile(p.userId);
       if (mounted) _toast('You liked ${p.name}');
+      ref.invalidate(remainingLikesTodayProvider);
       // If this like completes a mutual pair, the live trigger creates the
       // match + conversation server-side; we don't pop "It's a Match!" here —
       // the Likes screen holds the realtime `matches` subscription and shows
@@ -77,6 +82,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       // double popup.
     } on AlreadySwipedException {
       if (mounted) _toast('You already liked ${p.name}');
+    } on DailyLikeCapExceededException {
+      setState(() => _dismissed.remove(p.userId));
+      if (mounted) _showLikeCapReached();
     } catch (_) {
       if (mounted) _toast('Could not save — try again.');
     }
@@ -90,19 +98,52 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     try {
       await ref.read(swipeRepositoryProvider).likeProfile(p.userId);
       if (mounted) _toast('Super liked ${p.name} ⭐');
+      ref.invalidate(remainingLikesTodayProvider);
     } on AlreadySwipedException {
       if (mounted) _toast('You already liked ${p.name}');
+    } on DailyLikeCapExceededException {
+      setState(() => _dismissed.remove(p.userId));
+      if (mounted) _showLikeCapReached();
     } catch (_) {
       if (mounted) _toast('Could not save — try again.');
     }
   }
 
-  void _report(Profile p) {
-    // [Phase 2 data gap] the `reports` table doesn't exist server-side yet
-    // (confirmed 404 against the live project) — no report can actually be
-    // filed. Wire the entry point now; swap the toast for the real flow once
-    // the backend ships it.
-    _toast('Reporting will be available soon.');
+  /// Shown when the proposed `can_send_like` RPC rejects a like — see
+  /// `BACKEND_ATIER_HANDOFF.md` §4. Not reachable until backend ships that
+  /// RPC ([BE-10]); free-tier likes are unlimited client-side until then.
+  void _showLikeCapReached() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Daily like limit reached'),
+        content: const Text(
+          'Free accounts get 50 likes every 24 hours. Upgrade to Premium '
+          'for unlimited likes, or try again tomorrow.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.push(RoutePaths.subscription);
+            },
+            child: const Text('Upgrade'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _report(Profile p) async {
+    await ReportUserSheet.show(
+      context,
+      reportedUserId: p.userId,
+      reportedName: p.name,
+    );
   }
 
   @override
@@ -117,16 +158,19 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       },
       child: feed.when(
         loading: () => _loading(),
-        error: (e, _) => ListView(children: [
-          const SizedBox(height: 200),
-          ErrorView(
-            message: 'Could not load profiles.',
-            onRetry: () => ref.invalidate(discoverFeedProvider),
-          ),
-        ]),
+        error: (e, _) => ListView(
+          children: [
+            const SizedBox(height: 200),
+            ErrorView(
+              message: 'Could not load profiles.',
+              onRetry: () => ref.invalidate(discoverFeedProvider),
+            ),
+          ],
+        ),
         data: (profiles) {
-          final remaining =
-              profiles.where((p) => !_dismissed.contains(p.userId)).toList();
+          final remaining = profiles
+              .where((p) => !_dismissed.contains(p.userId))
+              .toList();
           if (remaining.isEmpty) {
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -158,13 +202,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   }
 
   Widget _loading() => ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-          SkeletonBox(height: 440, radius: 24),
-          SizedBox(height: 16),
-          SkeletonBox(height: 60, radius: 16),
-        ],
-      );
+    padding: const EdgeInsets.all(16),
+    children: const [
+      SkeletonBox(height: 440, radius: 24),
+      SizedBox(height: 16),
+      SkeletonBox(height: 60, radius: 16),
+    ],
+  );
 
   // ---- 2.1 Above the card ---------------------------------------------
 
@@ -190,7 +234,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () => InfoModals.locationPermission(context),
-              child: const Icon(LucideIcons.mapPin, size: 18, color: AppColors.mutedFg),
+              child: const Icon(
+                LucideIcons.mapPin,
+                size: 18,
+                color: AppColors.mutedFg,
+              ),
             ),
           ],
         ),
@@ -201,10 +249,17 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             Text(
               isPremium ? '1000+ profiles/month' : '50 profiles/month',
               style: const TextStyle(
-                  color: AppColors.mutedFg, fontWeight: FontWeight.w600),
+                color: AppColors.mutedFg,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             if (isPremium)
-              const AppChip(label: 'Gold Plan', emoji: '👑', tone: AppChipTone.pink, dense: true),
+              const AppChip(
+                label: 'Gold Plan',
+                emoji: '👑',
+                tone: AppChipTone.pink,
+                dense: true,
+              ),
           ],
         ),
         // [Phase 2 data gap] "stale location" needs a real geolocator-backed
@@ -225,12 +280,15 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ? photos.map((ph) => ph.photoUrl).toList()
         : (p.photoUrl != null ? [p.photoUrl!] : <String>[]);
     final activeIndex = (_photoIndex[p.userId] ?? 0).clamp(
-        0, photoUrls.isEmpty ? 0 : photoUrls.length - 1);
+      0,
+      photoUrls.isEmpty ? 0 : photoUrls.length - 1,
+    );
 
     void advancePhoto() {
       if (photoUrls.length < 2) return;
-      setState(() =>
-          _photoIndex[p.userId] = (activeIndex + 1) % photoUrls.length);
+      setState(
+        () => _photoIndex[p.userId] = (activeIndex + 1) % photoUrls.length,
+      );
     }
 
     void selectPhoto(int i) => setState(() => _photoIndex[p.userId] = i);
@@ -277,10 +335,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         imageUrl: photoUrls[activeIndex],
                         fit: BoxFit.cover,
                         placeholder: (_, _) => Container(
-                            color: theme.colorScheme.surfaceContainerHighest),
+                          color: theme.colorScheme.surfaceContainerHighest,
+                        ),
                         errorWidget: (_, _, _) => Container(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            child: const Icon(LucideIcons.user, size: 64)),
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: const Icon(LucideIcons.user, size: 64),
+                        ),
                       )
                     else
                       Container(
@@ -309,7 +369,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                               Expanded(
                                 child: Container(
                                   margin: EdgeInsets.only(
-                                      right: i == photoUrls.length - 1 ? 0 : 4),
+                                    right: i == photoUrls.length - 1 ? 0 : 4,
+                                  ),
                                   height: 3,
                                   decoration: BoxDecoration(
                                     color: i <= activeIndex
@@ -357,8 +418,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           if (p.isVerified)
-                            const Icon(LucideIcons.badgeCheck,
-                                color: Colors.white, size: 26),
+                            const Icon(
+                              LucideIcons.badgeCheck,
+                              color: Colors.white,
+                              size: 26,
+                            ),
                           // [Phase 2 data gap] "last active" needs
                           // `user_presence.last_seen`, which nothing reads yet —
                           // hidden until that's wired.
@@ -383,8 +447,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                 shape: BoxShape.circle,
                                 color: Colors.black45,
                               ),
-                              child: const Icon(LucideIcons.chevronRight,
-                                  color: Colors.white, size: 18),
+                              child: const Icon(
+                                LucideIcons.chevronRight,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                           ),
                         ),
@@ -399,11 +466,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                           Row(
                             children: [
                               Flexible(
-                                child: Text('${p.name}, ${p.ageLabel}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.headlineMedium
-                                        ?.copyWith(color: Colors.white)),
+                                child: Text(
+                                  '${p.name}, ${p.ageLabel}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.headlineMedium
+                                      ?.copyWith(color: Colors.white),
+                                ),
                               ),
                               const SizedBox(width: 8),
                               if (p.isOnline)
@@ -411,19 +480,26 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                   width: 12,
                                   height: 12,
                                   decoration: const BoxDecoration(
-                                      color: AppColors.online,
-                                      shape: BoxShape.circle),
+                                    color: AppColors.online,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text('${p.city}, ${p.country}',
-                              style: const TextStyle(color: Colors.white70)),
+                          Text(
+                            '${p.city}, ${p.country}',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
                           if (p.relationshipGoal != null) ...[
                             const SizedBox(height: 4),
-                            Text('Need a ${p.relationshipGoal} 💍',
-                                style: const TextStyle(
-                                    color: Colors.white, fontWeight: FontWeight.w600)),
+                            Text(
+                              'Need a ${p.relationshipGoal} 💍',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                           const SizedBox(height: 8),
                           Wrap(
@@ -453,13 +529,18 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                   dense: true,
                                 ),
                               for (final hobby in p.hobbies.take(3))
-                                AppChip(label: hobby, tone: AppChipTone.grey, dense: true),
+                                AppChip(
+                                  label: hobby,
+                                  tone: AppChipTone.grey,
+                                  dense: true,
+                                ),
                             ],
                           ),
-                          if (p.hobbies.length > 3 || (p.bio ?? '').isNotEmpty) ...[
+                          if (p.hobbies.length > 3 ||
+                              (p.bio ?? '').isNotEmpty) ...[
                             const SizedBox(height: 6),
                             GestureDetector(
-                              onTap: () => _showMore(p),
+                              onTap: () => ProfilePreviewModal.show(context, p),
                               child: const AppChip(
                                 label: 'Show more',
                                 icon: LucideIcons.chevronDown,
@@ -520,14 +601,19 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                               color: Colors.black54,
                               shape: BoxShape.circle,
                             ),
-                            constraints:
-                                const BoxConstraints(minWidth: 16, minHeight: 16),
-                            child: Text('${i + 1}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700)),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              '${i + 1}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -540,52 +626,51 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     );
   }
 
-  void _showMore(Profile p) {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${p.name}, ${p.ageLabel}',
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final hobby in p.hobbies)
-                  AppChip(label: hobby, tone: AppChipTone.grey),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ---- 2.3 Action buttons -------------------------------------------------
 
   Widget _actionRow(Profile p) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _actionBtn(LucideIcons.x, Colors.white, Colors.black87,
-              () => _pass(p), 'Pass'),
-          _actionBtn(LucideIcons.star, AppColors.gold, Colors.white,
-              () => _superLike(p), 'Super'),
-          _actionBtn(LucideIcons.messageCircle, AppColors.success, Colors.white,
-              () => context.push(RoutePaths.chatTo(p.userId)), 'Message'),
-          _actionBtn(LucideIcons.heart, AppColors.pink, Colors.white,
-              () => _like(p), 'Like', big: true),
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    children: [
+      _actionBtn(
+        LucideIcons.x,
+        Colors.white,
+        Colors.black87,
+        () => _pass(p),
+        'Pass',
+      ),
+      _actionBtn(
+        LucideIcons.star,
+        AppColors.gold,
+        Colors.white,
+        () => _superLike(p),
+        'Super',
+      ),
+      _actionBtn(
+        LucideIcons.messageCircle,
+        AppColors.success,
+        Colors.white,
+        () => context.push(RoutePaths.chatTo(p.userId)),
+        'Message',
+      ),
+      _actionBtn(
+        LucideIcons.heart,
+        AppColors.pink,
+        Colors.white,
+        () => _like(p),
+        'Like',
+        big: true,
+      ),
+    ],
+  );
 
-  Widget _actionBtn(IconData icon, Color bg, Color fg, VoidCallback onTap,
-      String label,
-      {bool big = false}) {
+  Widget _actionBtn(
+    IconData icon,
+    Color bg,
+    Color fg,
+    VoidCallback onTap,
+    String label, {
+    bool big = false,
+  }) {
     final size = big ? 68.0 : 56.0;
     return Material(
       color: bg,

@@ -82,11 +82,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   void _toast(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(msg),
-        backgroundColor: error ? AppColors.destructive : AppColors.pink,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: error ? AppColors.destructive : AppColors.pink,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   Future<void> _submit() async {
@@ -101,7 +103,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final email = _email.text.trim();
     try {
       if (_isSignUp) {
-        await auth.signUp(email, _password.text);
+        final res = await auth.signUp(email, _password.text);
+        if (res.session == null) {
+          // Confirm-email is on server-side: no session yet — the user must
+          // tap the emailed link first. Route to the "check your email"
+          // screen instead of relying on the guard (there's no session to
+          // trigger it, and we're staying on a public route either way).
+          if (mounted) {
+            context.push(
+              '${RoutePaths.emailVerified}?email=${Uri.encodeComponent(email)}',
+            );
+          }
+          return;
+        }
       } else {
         await auth.signIn(email, _password.text);
         await ref
@@ -135,8 +149,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(maxWidth: AppConstants.maxContainerWidth),
+              constraints: const BoxConstraints(
+                maxWidth: AppConstants.maxContainerWidth,
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -165,11 +180,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       validator: Validators.password,
                       decoration: InputDecoration(
-                        hintText: 'Min ${AppConstants.minPasswordChars} characters',
+                        hintText:
+                            'Min ${AppConstants.minPasswordChars} characters',
                         prefixIcon: const Icon(LucideIcons.lock),
                         suffixIcon: IconButton(
                           icon: Icon(
-                              _obscure ? LucideIcons.eye : LucideIcons.eyeOff),
+                            _obscure ? LucideIcons.eye : LucideIcons.eyeOff,
+                          ),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
@@ -195,17 +212,25 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         child: const Text(
                           'Forgot password?',
                           style: TextStyle(
-                              color: AppColors.pink,
-                              fontWeight: FontWeight.w700),
+                            color: AppColors.pink,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     TextButton.icon(
                       onPressed: _refresh,
-                      icon: const Icon(LucideIcons.refreshCw,
-                          size: 16, color: AppColors.mutedFg),
-                      label: const Text('Refresh',
-                          style: TextStyle(color: AppColors.mutedFg)),
+                      icon: const Icon(
+                        LucideIcons.refreshCw,
+                        size: 16,
+                        color: AppColors.mutedFg,
+                      ),
+                      label: const Text(
+                        'Refresh',
+                        style: TextStyle(color: AppColors.mutedFg),
+                      ),
                     ),
+                    const SizedBox(height: 4),
+                    _legalFooter(),
                   ],
                 ),
               ),
@@ -216,140 +241,182 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     );
   }
 
+  /// Always-visible legal links footer — shown on both Login and Sign Up
+  /// (not just buried in the Sign Up terms checkbox), per explicit request
+  /// that Privacy/Terms/Refund/Child Safety be reachable by everyone,
+  /// signed-up or not.
+  Widget _legalFooter() => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 4,
+      runSpacing: 2,
+      children: [
+        _footerLink('Privacy & Terms', RoutePaths.privacy),
+        _footerDot(),
+        _footerLink('Refund Policy', RoutePaths.refund),
+        _footerDot(),
+        _footerLink('Child Safety', RoutePaths.childSafety),
+      ],
+    ),
+  );
+
+  Widget _footerDot() =>
+      const Text('·', style: TextStyle(color: AppColors.mutedFg, fontSize: 12));
+
+  Widget _footerLink(String label, String route) => GestureDetector(
+    onTap: () => context.push(route),
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: AppColors.mutedFg,
+        fontSize: 12,
+        decoration: TextDecoration.underline,
+      ),
+    ),
+  );
+
   Widget _label(ThemeData theme, String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 8, left: 2),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 8, left: 2),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: theme.colorScheme.onSurface,
+      ),
+    ),
+  );
 
   Widget _logo(ThemeData theme) => Column(
-        children: [
-          Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(
-              gradient: AppGradients.cta,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.pink.withValues(alpha: 0.35),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+    children: [
+      Container(
+        width: 84,
+        height: 84,
+        decoration: BoxDecoration(
+          gradient: AppGradients.cta,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.pink.withValues(alpha: 0.35),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
             ),
-            child: const Icon(LucideIcons.heart, color: Colors.white, size: 40),
-          ),
-          const SizedBox(height: 14),
-          Text('LoveMe',
-              style: theme.textTheme.headlineMedium
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          Text('Find your perfect match',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: AppColors.mutedFg)),
-        ],
-      );
+          ],
+        ),
+        child: const Icon(LucideIcons.heart, color: Colors.white, size: 40),
+      ),
+      const SizedBox(height: 14),
+      Text(
+        'LoveMe',
+        style: theme.textTheme.headlineMedium?.copyWith(
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        'Find your perfect match',
+        style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.mutedFg),
+      ),
+    ],
+  );
 
   /// Full-bleed segmented control — squarer than our old rounded pills.
   Widget _tabs(ThemeData theme) => Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: theme.colorScheme.outline),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Row(
-          children: [
-            _tab('Login', !_isSignUp, () => setState(() => _isSignUp = false)),
-            _tab('Sign Up', _isSignUp, () => setState(() => _isSignUp = true)),
-          ],
-        ),
-      );
+    decoration: BoxDecoration(
+      color: theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: theme.colorScheme.outline),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Row(
+      children: [
+        _tab('Login', !_isSignUp, () => setState(() => _isSignUp = false)),
+        _tab('Sign Up', _isSignUp, () => setState(() => _isSignUp = true)),
+      ],
+    ),
+  );
 
   Widget _tab(String label, bool selected, VoidCallback onTap) => Expanded(
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            color: selected ? AppColors.pink : Colors.transparent,
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : AppColors.mutedFg,
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
-            ),
+    child: GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        color: selected ? AppColors.pink : Colors.transparent,
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : AppColors.mutedFg,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
           ),
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _rememberMeRow(bool rememberMe) => Row(
-        children: [
-          Checkbox(
-            value: rememberMe,
-            shape: const CircleBorder(),
-            activeColor: AppColors.pink,
-            onChanged: (v) => ref
-                .read(localSettingsProvider.notifier)
-                .setRememberEmail(v ?? false),
-          ),
-          const Text('Remember me'),
-        ],
-      );
+    children: [
+      Checkbox(
+        value: rememberMe,
+        shape: const CircleBorder(),
+        activeColor: AppColors.pink,
+        onChanged: (v) => ref
+            .read(localSettingsProvider.notifier)
+            .setRememberEmail(v ?? false),
+      ),
+      const Text('Remember me'),
+    ],
+  );
 
   Widget _termsCheckbox(ThemeData theme) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Checkbox(
-            value: _acceptTerms,
-            shape: const CircleBorder(),
-            activeColor: AppColors.pink,
-            onChanged: (v) => setState(() => _acceptTerms = v ?? false),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text.rich(
-                TextSpan(
-                  style: theme.textTheme.bodySmall,
-                  children: [
-                    const TextSpan(text: 'I confirm I am at least '),
-                    const TextSpan(
-                        text: '18 years old',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                    const TextSpan(
-                        text: ', I am using this app voluntarily, and I agree '
-                            'to the '),
-                    _linkSpan('Terms & Conditions', _termsTap),
-                    const TextSpan(text: ' and '),
-                    _linkSpan('Privacy Policy', _privacyTap),
-                    const TextSpan(text: '.'),
-                  ],
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Checkbox(
+        value: _acceptTerms,
+        shape: const CircleBorder(),
+        activeColor: AppColors.pink,
+        onChanged: (v) => setState(() => _acceptTerms = v ?? false),
+      ),
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text.rich(
+            TextSpan(
+              style: theme.textTheme.bodySmall,
+              children: [
+                const TextSpan(text: 'I confirm I am at least '),
+                const TextSpan(
+                  text: '18 years old',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-              ),
+                const TextSpan(
+                  text:
+                      ', I am using this app voluntarily, and I agree '
+                      'to the ',
+                ),
+                _linkSpan('Terms & Conditions', _termsTap),
+                const TextSpan(text: ' and '),
+                _linkSpan('Privacy Policy', _privacyTap),
+                const TextSpan(text: '.'),
+              ],
             ),
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 
   TextSpan _linkSpan(String text, TapGestureRecognizer recognizer) => TextSpan(
-        text: text,
-        style: const TextStyle(
-          color: AppColors.pink,
-          fontWeight: FontWeight.w700,
-          decoration: TextDecoration.underline,
-        ),
-        recognizer: recognizer,
-      );
+    text: text,
+    style: const TextStyle(
+      color: AppColors.pink,
+      fontWeight: FontWeight.w700,
+      decoration: TextDecoration.underline,
+    ),
+    recognizer: recognizer,
+  );
 }

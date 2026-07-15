@@ -8,4 +8,11 @@ class SupabaseConfig {
 
   static const url = String.fromEnvironment('SUPABASE_URL');
   static const anonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  /// Where a Supabase auth email's link (sign-up confirmation, password
+  /// reset) sends the user back to. Must match the Android manifest's
+  /// intent-filter (`android/app/src/main/AndroidManifest.xml`) and be
+  /// registered as the Redirect URL in the Supabase Auth dashboard — see
+  /// `app doctumant/BACKEND_CONFIRM_EMAIL_HANDOFF.md`.
+  static const emailRedirectUrl = 'lovemeinternational://login-callback';
 }

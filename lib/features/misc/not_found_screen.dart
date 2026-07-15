@@ -19,9 +19,12 @@ class NotFoundScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('404',
-                    style: theme.textTheme.displayLarge
-                        ?.copyWith(color: AppColors.pink)),
+                Text(
+                  '404',
+                  style: theme.textTheme.displayLarge?.copyWith(
+                    color: AppColors.pink,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Text('Page not found', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 24),

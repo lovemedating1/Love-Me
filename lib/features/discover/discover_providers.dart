@@ -5,7 +5,18 @@ import '../../shared/models/profile.dart';
 import '../../shared/models/profile_photo.dart';
 
 /// Radius presets shown as chips in the search-radius sheet (km).
-const List<int> kRadiusPresetsKm = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+const List<int> kRadiusPresetsKm = [
+  5,
+  10,
+  25,
+  50,
+  100,
+  250,
+  500,
+  1000,
+  2500,
+  5000,
+];
 
 /// Discover feed filters.
 class DiscoverFilters {
@@ -33,15 +44,14 @@ class DiscoverFilters {
     bool clearGender = false,
     bool? onlineOnly,
     bool? verifiedOnly,
-  }) =>
-      DiscoverFilters(
-        minAge: minAge ?? this.minAge,
-        maxAge: maxAge ?? this.maxAge,
-        maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
-        gender: clearGender ? null : (gender ?? this.gender),
-        onlineOnly: onlineOnly ?? this.onlineOnly,
-        verifiedOnly: verifiedOnly ?? this.verifiedOnly,
-      );
+  }) => DiscoverFilters(
+    minAge: minAge ?? this.minAge,
+    maxAge: maxAge ?? this.maxAge,
+    maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
+    gender: clearGender ? null : (gender ?? this.gender),
+    onlineOnly: onlineOnly ?? this.onlineOnly,
+    verifiedOnly: verifiedOnly ?? this.verifiedOnly,
+  );
 
   bool matches(Profile p) {
     final age = p.age;
@@ -56,7 +66,8 @@ class DiscoverFilters {
 
 final discoverFiltersProvider =
     NotifierProvider<DiscoverFiltersController, DiscoverFilters>(
-        DiscoverFiltersController.new);
+      DiscoverFiltersController.new,
+    );
 
 class DiscoverFiltersController extends Notifier<DiscoverFilters> {
   @override
@@ -83,8 +94,10 @@ final searchRadiusKmProvider = StateProvider<int>((ref) => 50);
 /// Gallery photos for a Discover card, keyed by user id. Falls back to just
 /// the single `photoUrl` when the user has no `profile_photos` rows (e.g.
 /// mock candidates, or real users who haven't uploaded a gallery yet).
-final cardPhotosProvider =
-    FutureProvider.family<List<ProfilePhoto>, String>((ref, userId) async {
+final cardPhotosProvider = FutureProvider.family<List<ProfilePhoto>, String>((
+  ref,
+  userId,
+) async {
   try {
     return await ref.read(profilePhotoRepositoryProvider).photosFor(userId);
   } catch (_) {

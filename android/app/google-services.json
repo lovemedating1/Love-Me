@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "119566056876",
+    "project_id": "love-me-international",
+    "storage_bucket": "love-me-international.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:119566056876:android:a9bb69c0661a6c31e00e09",
+        "android_client_info": {
+          "package_name": "com.example.love_me"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA98GW470e4gwB8ObYEqoI8v7FQ1qCnkKM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:119566056876:android:c37e2164fd3f647ae00e09",
+        "android_client_info": {
+          "package_name": "com.loveme.international"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA98GW470e4gwB8ObYEqoI8v7FQ1qCnkKM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

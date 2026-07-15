@@ -19,11 +19,7 @@ class AppTheme {
 
   /// The soft drop shadow under white cards in the old app.
   static const List<BoxShadow> cardShadow = [
-    BoxShadow(
-      color: Color(0x14000000),
-      blurRadius: 18,
-      offset: Offset(0, 6),
-    ),
+    BoxShadow(color: Color(0x14000000), blurRadius: 18, offset: Offset(0, 6)),
   ];
 
   static ThemeData light() {
@@ -94,8 +90,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: scheme.surface,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(_radius),
           borderSide: BorderSide(color: scheme.outline),
@@ -114,7 +112,8 @@ class AppTheme {
         elevation: 0,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(cardRadius)),
+          borderRadius: BorderRadius.circular(cardRadius),
+        ),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: scheme.secondary.withValues(alpha: 0.35),
@@ -125,15 +124,16 @@ class AppTheme {
       // Large, pink-filled switches (old app style).
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected)
-                ? AppColors.white
-                : AppColors.white),
+          (s) => s.contains(WidgetState.selected)
+              ? AppColors.white
+              : AppColors.white,
+        ),
         trackColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected)
-                ? AppColors.pink
-                : scheme.outline),
-        trackOutlineColor:
-            const WidgetStatePropertyAll(Colors.transparent),
+          (s) => s.contains(WidgetState.selected)
+              ? AppColors.pink
+              : scheme.outline,
+        ),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
       dividerTheme: DividerThemeData(color: scheme.outline, thickness: 1),
     );

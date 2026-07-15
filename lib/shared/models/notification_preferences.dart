@@ -46,30 +46,28 @@ class NotificationPreferences extends Equatable {
     bool? callNotifications,
     bool? profileViewNotifications,
     bool? marketingNotifications,
-  }) =>
-      NotificationPreferences(
-        pushEnabled: pushEnabled ?? this.pushEnabled,
-        emailEnabled: emailEnabled ?? this.emailEnabled,
-        likeNotifications: likeNotifications ?? this.likeNotifications,
-        matchNotifications: matchNotifications ?? this.matchNotifications,
-        messageNotifications:
-            messageNotifications ?? this.messageNotifications,
-        callNotifications: callNotifications ?? this.callNotifications,
-        profileViewNotifications:
-            profileViewNotifications ?? this.profileViewNotifications,
-        marketingNotifications:
-            marketingNotifications ?? this.marketingNotifications,
-      );
+  }) => NotificationPreferences(
+    pushEnabled: pushEnabled ?? this.pushEnabled,
+    emailEnabled: emailEnabled ?? this.emailEnabled,
+    likeNotifications: likeNotifications ?? this.likeNotifications,
+    matchNotifications: matchNotifications ?? this.matchNotifications,
+    messageNotifications: messageNotifications ?? this.messageNotifications,
+    callNotifications: callNotifications ?? this.callNotifications,
+    profileViewNotifications:
+        profileViewNotifications ?? this.profileViewNotifications,
+    marketingNotifications:
+        marketingNotifications ?? this.marketingNotifications,
+  );
 
   @override
   List<Object?> get props => [
-        pushEnabled,
-        emailEnabled,
-        likeNotifications,
-        matchNotifications,
-        messageNotifications,
-        callNotifications,
-        profileViewNotifications,
-        marketingNotifications,
-      ];
+    pushEnabled,
+    emailEnabled,
+    likeNotifications,
+    matchNotifications,
+    messageNotifications,
+    callNotifications,
+    profileViewNotifications,
+    marketingNotifications,
+  ];
 }

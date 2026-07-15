@@ -2,14 +2,21 @@ import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../data/repositories.dart';
 import '../models/profile.dart';
 
 /// Square profile tile for grids (Likes, Explore). Optional [blurred] hides the
 /// photo for the free-tier "Liked You" premium gate.
-class ProfileTile extends StatelessWidget {
+///
+/// `ConsumerWidget` (was `StatelessWidget`) so the online dot can read real
+/// presence via [presenceForProvider] instead of the always-false local-only
+/// `Profile.isOnline` — matches how the chat header already shows a real
+/// online dot (see `presenceForProvider` doc in `repositories.dart`).
+class ProfileTile extends ConsumerWidget {
   const ProfileTile({
     super.key,
     required this.profile,
@@ -26,8 +33,11 @@ class ProfileTile extends StatelessWidget {
   final IconData? overlayIcon;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isOnline =
+        ref.watch(presenceForProvider(profile.userId)).valueOrNull?.isOnline ??
+        false;
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -43,10 +53,12 @@ class ProfileTile extends StatelessWidget {
                   imageUrl: profile.photoUrl!,
                   fit: BoxFit.cover,
                   placeholder: (_, _) => Container(
-                      color: theme.colorScheme.surfaceContainerHighest),
+                    color: theme.colorScheme.surfaceContainerHighest,
+                  ),
                   errorWidget: (_, _, _) => Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: const Icon(LucideIcons.user)),
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: const Icon(LucideIcons.user),
+                  ),
                 )
               else
                 Container(color: theme.colorScheme.surfaceContainerHighest),
@@ -66,14 +78,15 @@ class ProfileTile extends StatelessWidget {
               ),
               if (blurred)
                 const Center(
-                    child: Icon(LucideIcons.lock, color: Colors.white, size: 32)),
+                  child: Icon(LucideIcons.lock, color: Colors.white, size: 32),
+                ),
               if (overlayIcon != null && !blurred)
                 Positioned(
                   top: 8,
                   right: 8,
                   child: Icon(overlayIcon, color: AppColors.pink, size: 22),
                 ),
-              if (profile.isOnline && !blurred)
+              if (isOnline && !blurred)
                 Positioned(
                   top: 8,
                   left: 8,
@@ -81,9 +94,10 @@ class ProfileTile extends StatelessWidget {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                        color: AppColors.online,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2)),
+                      color: AppColors.online,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
                   ),
                 ),
               Positioned(
@@ -94,19 +108,25 @@ class ProfileTile extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        blurred ? '•••••, ${profile.ageLabel}' : '${profile.name}, ${profile.ageLabel}',
+                        blurred
+                            ? '•••••, ${profile.ageLabel}'
+                            : '${profile.name}, ${profile.ageLabel}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                     if (profile.isVerified && !blurred) ...[
                       const SizedBox(width: 4),
-                      const Icon(LucideIcons.badgeCheck,
-                          color: Colors.white, size: 14),
+                      const Icon(
+                        LucideIcons.badgeCheck,
+                        color: Colors.white,
+                        size: 14,
+                      ),
                     ],
                   ],
                 ),

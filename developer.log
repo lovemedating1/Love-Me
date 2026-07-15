@@ -2408,3 +2408,1540 @@ Known items to resolve before / during build (from spec analysis):
     black-screen-APK lesson from the prior session). NOT run on-device -
     recommend visually comparing the rebuilt Discover card against
     WA0034/WA0050 side-by-side on a real screen.
+
+[2026-07-11] POLISH: onboarding text too dark/heavy + photo circle too big
+  User feedback: "everything is slightly too black" on the onboarding
+  screens, and the Step 2 photo-upload circle is too big.
+  Root cause (text): FieldLabel, dropdown option text, warning-banner text,
+  the location button's label, the goal-picker label, and the hobby-picker
+  text/icons were all styled with AppColors.fgLight (#1F1F1F, near-pure-
+  black) at bold weights (w700/w800) - correct for step TITLES (which
+  should stay bold black to match the reference screenshots) but too heavy
+  for body-level text/labels, reading as "too black" overall.
+  Fix:
+    - core/theme/app_colors.dart: added AppColors.fgSoft (#3A3A3A) - a
+      softer near-black reserved for body text/labels, leaving fgLight
+      (#1F1F1F) untouched and still used app-wide for headings/titles (did
+      NOT change fgLight's value globally, to avoid affecting other already-
+      correct screens).
+    - features/onboarding/onboarding_widgets.dart: FieldLabel color
+      fgLight->fgSoft, weight w700->w600, size 15->14.5. DropdownSheetField's
+      selected-value text and options-list text: fgLight->fgSoft, selected-
+      row weight w800->w700.
+    - features/onboarding/profile_setup_screen.dart: softened body-level
+      fgLight usages to fgSoft (birthday warning banner text w800->w700,
+      location button icon+label w700->w600, "What are you looking for?"
+      label now explicitly fgSoft+w600 instead of default black, hobby-
+      picker trigger text/chevron and hobby-chip label fgLight->fgSoft
+      +w700->w600 where applicable). Step TITLES ("About You", "Add Your
+      Photos", "Your Location", "Interests & Goals") deliberately LEFT
+      fgLight+w800 - those should stay bold black to match the old app's
+      reference screenshots; only body/label text was lightened.
+  Fix (circle size): Step 2's photo-upload target Container shrunk from
+    220x220 to 160x160, with the inner camera icon (36->30) and "Tap to
+    upload" text (added explicit fontSize: 13, was default ~14) scaled down
+    proportionally so it doesn't look empty inside the smaller circle.
+  Result: flutter analyze clean (same 4 pre-existing-style info lints,
+    unrelated). flutter test green (2). flutter build apk --debug
+    --dart-define=... -> SUCCESS, verified via kernel_blob.bin extraction
+    (Supabase URL confirmed embedded). NOT run on-device - recommend a
+    visual check that body text now reads noticeably lighter than titles
+    and the photo circle looks proportionate on Step 2.
+
+[2026-07-11] REAL LEGAL COPY + ringtone preview fix + Settings cleanup + legal visibility
+  User sent 2 batches of feedback: (1) Settings screenshots annotated
+  "these ringtones don't work when I click play" + "delete this sign out
+  button" + "complete the privacy policy terms child safety etc, also bring
+  them at the top on the sign up section... kindly to be visible to
+  everyone", then (2) when asked how to handle the still-lorem-ipsum legal
+  pages, the user's ANSWER was 11 full screenshots of the OLD APP'S real,
+  already-published Privacy & Terms / Terms & Conditions / Child Safety
+  Standards pages - i.e. this was real content to transcribe, not a request
+  for me to draft legal text myself. Transcribed it verbatim.
+
+  1) LEGAL COPY (lib/features/legal/legal_screen.dart, REWRITTEN + NEW
+     LegalHubScreen/ChildSafetyScreen classes) - replaced ALL `_lorem`
+     placeholder text with the real copy from the screenshots:
+    - LegalScreen (shared scaffold, now used for Terms + Refund only):
+      restyled section rendering as white/red-tinted cards with a bulleted-
+      list option and a bold-red "warningNote" closing line, matching the
+      old app's "Explicit Content & Nudity Policy" / "Terrorism, Violence &
+      War Content Policy" prohibited-content sections (red heading, ban
+      icon, bulleted list, bold-red violation-consequence line).
+      LegalScreen.terms() now has the FULL real Terms document: Age
+      Requirement, Voluntary Use, Explicit Content & Nudity Policy,
+      Terrorism/Violence/War Content Policy, Content Moderation & Chat
+      Safety, Blocking & Reporting Users, Account Banning & Permanent
+      Deletion, Data Safety & Privacy, User Responsibility, Intellectual
+      Property, 90-Day Data Retention Policy, Account Termination - all
+      transcribed verbatim from the screenshots (11 sections total).
+      LegalScreen.refund() - real Refund Policy (Subscriptions/Coins &
+      Virtual Items/How to Request/Account Deletion & Refunds) - the old
+      app's refund screenshots weren't provided so this section follows the
+      pattern already established in migration_00x docs (app-store-
+      routed refunds, non-refundable virtual items, 14-day request window)
+      rather than being invented from nothing - FLAGGED as the one section
+      not directly transcribed, in case the user has the old app's real
+      Refund Policy screenshots to provide later.
+      REMOVED LegalScreen.privacy() entirely - the old app doesn't have a
+      separate Privacy Policy page; privacy content lives on the hub itself
+      (see next item).
+    - LegalHubScreen (NEW) - the real "Privacy & Terms" hub screen from the
+      screenshots: shield icon + title, "Last updated" (computed from
+      today's date, matching the old app's live-updating pattern rather
+      than a hardcoded stale date), 2 pink link cards ("Terms & Conditions"
+      -> RoutePaths.terms, "Refund Policy" -> RoutePaths.refund), then the
+      Age Requirement (with "18 years old" highlighted red inline, matching
+      the screenshot) and Voluntary Use sections inline on the hub itself
+      exactly as shown. This is now what RoutePaths.privacy resolves to
+      (was LegalScreen.privacy() with lorem text; now a real hub).
+    - ChildSafetyScreen (NEW, separate top-level widget, not reusing
+      LegalScreen's title bar) - the real Child Safety Standards page: a
+      solid-red full-width "Report CSAM / Child Safety Concern" button at
+      the top (opens a real dialog with the emergency-services line, the
+      email lovemedatingappchildsafety@gmail.com, and the NCMEC CyberTipline
+      URL - matches the screenshot's own reporting instructions, not a
+      fake/no-op button), the app/developer identity heading ("Love Me
+      International Dating App - Published Standards Against CSAE"), a red-
+      bordered "GOOGLE PLAY CHILD SAFETY STANDARDS - COMPLIANCE STATEMENT"
+      box with the developer name (The Orbit Devs) and Play Store listing
+      URL exactly as shown, 2 outline pill buttons ("Child Safety
+      Statement" / "Privacy Policy"), then the full real body content:
+      Zero Tolerance Policy, Age Requirement & Verification, In-App
+      Reporting Mechanism, How We Address CSAM, Prohibited Content &
+      Behaviour, Detection & Prevention, Reporting & Law Enforcement
+      Cooperation, How to Report (with the real email/NCMEC/emergency-
+      services instructions), Child Safety Point of Contact (Designated
+      Contact: Child Safety Officer, same email, "CHILD SAFETY - URGENT"
+      subject line, 24h/72h response times), Legal & Regulatory Compliance
+      (18 U.S.C. Section 2258A, PROTECT Act, EU DSA, UK OSA 2023,
+      Australia's OSA 2021), Our Commitment - all transcribed verbatim.
+    - core/router/app_router.dart: RoutePaths.privacy now builds
+      LegalHubScreen instead of LegalScreen.privacy(); RoutePaths.
+      childSafety now builds the new ChildSafetyScreen instead of
+      LegalScreen.childSafety().
+
+  2) LEGAL LINKS VISIBLE ON SIGN UP/LOGIN (features/auth/auth_screen.dart):
+     the old Terms & Conditions/Privacy Policy links only existed buried
+     inside the Sign-Up-only terms checkbox - invisible on the Login tab
+     and easy to miss even on Sign Up. Added a new always-visible
+     _legalFooter() row (Privacy & Terms / Refund Policy / Child Safety,
+     dot-separated, underlined, muted-gray) below the Refresh link on BOTH
+     tabs - "visible to everyone" per the request, not gated behind
+     switching to Sign Up. The Sign Up terms checkbox's own inline Terms/
+     Privacy links are UNCHANGED (kept - that's the 18+ consent gate itself,
+     a different purpose from general visibility).
+
+  3) SETTINGS "Sign out" ROW REMOVED (features/settings/settings_screen.dart):
+     user circled/scribbled "delete" over Settings' "Sign out" row.
+     Confirmed the Profile tab's 3-row card already has a "Log Out" entry
+     doing the exact same ref.read(authControllerProvider.notifier).
+     signOut() call, making Settings' copy purely redundant. Deleted
+     _signOutRow() entirely + its ListView reference; removed the now-
+     unused auth_controller.dart import from this file (nothing else in
+     Settings calls into it).
+
+  4) RINGTONE PREVIEW BUTTON NOW PLAYS SOUND (was: onPressed: null, tooltip
+     "Preview (coming soon)" - a deliberately disabled placeholder from an
+     earlier session because no Classic/Modern/Marimba audio files exist
+     anywhere in the project and none can be authored in this environment).
+     Asked the user how to handle it (AskUserQuestion) rather than either
+     leaving it broken or silently faking a fix; user chose: play the
+     device's built-in system notification sound as a real, working (if not
+     yet 3-distinctly-different-per-option) preview.
+    - pubspec.yaml: added flutter_ringtone_player ^4.0.0+2 - plays the OS's
+      system notification sound directly, no bundled audio assets needed.
+    - features/settings/settings_screen.dart: the preview IconButton is
+      now enabled, onPressed calls
+      FlutterRingtonePlayer().playNotification(); tooltip changed from
+      "Preview (coming soon)" to "Preview". Comment left in place flagging
+      that all 3 dropdown options currently play the SAME system sound
+      until real per-ringtone audio files are provided.
+
+  Result / verification (ALL GREEN):
+    - flutter analyze -> No issues found beyond the same 4 pre-existing-
+      style info lints (use_null_aware_elements, unrelated, unchanged).
+    - flutter test -> All tests passed (2, unchanged).
+    - flutter build apk --debug --dart-define=SUPABASE_URL=...
+      --dart-define=SUPABASE_ANON_KEY=... -> SUCCESS (noted one new,
+      harmless Java deprecation-API warning from flutter_ringtone_player's
+      own Android plugin code, not our code, doesn't fail the build).
+      Verified by extracting kernel_blob.bin and confirming the Supabase
+      URL is embedded (per the established post-black-screen-APK check).
+  NOT run on-device - recommend a full walkthrough of: the Privacy & Terms
+    hub link cards, the Terms/Refund/Child Safety pages' full scroll length
+    and the Report CSAM dialog, the Login screen's new legal footer, and
+    tapping the ringtone Preview button to confirm the phone actually makes
+    a sound.
+  FLAGGED, not fully resolved: Refund Policy section content was NOT
+    directly transcribed from an old-app screenshot (none was provided in
+    this batch) - it follows the same real-content pattern as the rest but
+    should be swapped for the old app's actual Refund Policy screenshots if/
+    when available, same as the ringtone audio files.
+
+[2026-07-11] Push notifications — Firebase project + client-side FCM (Android)
+  - Created Firebase project "Love Me International" (project ID
+    love-me-international) in the console (user action). Android
+    applicationId/namespace changed from the placeholder
+    `com.example.love_me` to the real `com.loveme.international` in
+    android/app/build.gradle.kts (also moved MainActivity.kt to the matching
+    kotlin/com/loveme/international/ package folder) BEFORE registering with
+    Firebase, since Play Store package names are permanent. iOS bundle id
+    (`com.example.loveMe`) was left untouched — Android-first per this repo's
+    convention; revisit before an iOS Firebase app is registered.
+  - Ran `flutterfire configure --project=love-me-international
+    --platforms=android --android-package-name=com.loveme.international`.
+    Generated lib/firebase_options.dart and
+    android/app/google-services.json (real values, not committed-secret —
+    these are client config, safe to check in per Firebase's own docs, but
+    double-check the repo's .gitignore posture before pushing).
+  - Added firebase_core ^4.11.0 + firebase_messaging ^16.4.1 via
+    `flutter pub add` (previously intentionally deferred, see pubspec.yaml
+    header comment, now updated).
+  - New files:
+    - lib/core/notifications/fcm_service.dart — FcmService: requestPermission,
+      getToken/onTokenRefresh (exposes `deviceToken` as the seam for whoever
+      wires the `fcm_tokens` table write once it exists server-side — it does
+      NOT exist yet per migration_004.md, so no write was attempted),
+      onMessage/onMessageOpenedApp/getInitialMessage handlers, plus the
+      required top-level `firebaseBackgroundMessageHandler`.
+    - lib/core/notifications/notification_router.dart — extracted the
+      notification-type -> route mapping out of
+      features/notifications/notifications_screen.dart (`_deepLink`) into a
+      shared `navigateForNotificationType()` so the in-app notifications list
+      and a push-tap open the exact same destinations, not two hand-maintained
+      copies.
+    - lib/core/router/navigator_key.dart — a root GlobalKey<NavigatorState>
+      wired into app_router.dart's GoRouter so the FCM background/terminated
+      tap handler (no BuildContext available that early) can still navigate.
+    - lib/shared/models/app_notification.dart — `_typeFromString` renamed to
+      public `notificationTypeFromWireValue` so fcm_service.dart can parse a
+      push payload's `data['type']` with the identical mapping the in-app
+      feed already uses for the `notifications` table's `type` column.
+  - bootstrap.dart: added Firebase.initializeApp(), background handler
+    registration, and FcmService.instance.init(), all before runApp().
+  - android/app/src/main/AndroidManifest.xml: added POST_NOTIFICATIONS
+    permission (Android 13+ runtime prompt) and the FCM default-notification-
+    icon meta-data.
+  - Why: user requested push notifications end-to-end, starting with the
+    Firebase project + client wiring. migration_004.md is explicit that
+    Firebase push delivery, the fcm_tokens table, and any dispatcher/Edge
+    Function are NOT built server-side yet — this session covers only the
+    client's half (receive + permission + token capture + deep-link on tap).
+  - Result / verification: flutter analyze -> 4 issues, all pre-existing
+    unrelated lint-style infos (use_null_aware_elements in chat_repository.dart
+    / repositories.dart), nothing in the new/changed notification files.
+    flutter test -> All tests passed (2, unchanged). NOT run on-device / no
+    real push received - can't be, until the fcm_tokens table + a sending
+    Edge Function exist server-side (backend track, out of scope for this
+    Flutter-only session per this repo's "never touch the backend" rule).
+  - Open items / follow-ups:
+    - Backend needs: an `fcm_tokens` table (user_id, token, platform,
+      updated_at + RLS: user can only read/write own row) and a
+      dispatcher/Edge Function that calls the FCM v1 API using the Firebase
+      service-account key (generate from Firebase console -> Project
+      Settings -> Service accounts; keep it out of the Flutter app entirely).
+    - Once that table exists, wire FcmService.deviceToken into a repository
+      write on login/token-refresh (the seam is already there, just unused).
+    - No local-notifications package yet, so a push received while the app
+      is foregrounded produces no system-tray banner today (only logged in
+      debug mode) — add flutter_local_notifications if an in-app foreground
+      banner is wanted before the backend dispatcher ships.
+    - iOS: no GoogleService-Info.plist / iOS Firebase app registered yet;
+      also needs APNs key upload in Firebase console when iOS work starts.
+    - Real device test still pending — needs a physical Android device or
+      emulator with Play services to confirm permission prompt + token
+      retrieval actually work (not exercised this session).
+
+[2026-07-11] Backend requirements handoff doc written
+  - New file: `app doctumant/BACKEND_REQUIREMENTS_HANDOFF.md` — consolidated,
+    prioritized list of everything outstanding on the backend side, written
+    for the separate backend team (not this Flutter session) to action.
+    Synthesizes BACKEND_REMAINING.md, BACKEND_MEDIA_REQUIREMENTS.md, and a
+    fresh read of current client code/models so every ask cites the exact
+    table/column/RPC name and shape the client already expects (e.g.
+    SafetyReport's fields for the `reports` table, DeviceSession's fields for
+    `active_sessions`, the 5 locked subscription tiers, the exact 50/24h +
+    50/month quota numbers already shown in the UI).
+  - Organized as P1 (launch blockers: image moderation, payments/
+    subscriptions, quota enforcement) / P2 (safety reports, blocking,
+    notification triggers + push dispatcher — the fcm_tokens table this
+    unblocks was flagged in the previous entry, device sessions/single-
+    device enforcement, account deletion) / P3 (discovery feed RPC, country
+    counts, conversation metadata sync, calling infra, verification,
+    extended profile fields, auth hardening, admin panel scope question,
+    virtual gifts) / a "already working, no action needed" reference list.
+  - Why: user requested a single doc to send to the backend team covering
+    everything required, before resuming frontend work.
+  - No code changes this entry — documentation only.
+
+[2026-07-11] Push-notifications-only backend handoff doc written
+  - New file: `app doctumant/BACKEND_PUSH_NOTIFICATIONS_HANDOFF.md` — a
+    standalone doc scoped to only the push-notification backend gap (split
+    out of the broader BACKEND_REQUIREMENTS_HANDOFF.md at user request, so
+    the backend team can pick up push in isolation first).
+  - Covers exactly two gaps: (1) nothing today inserts a row into
+    `notifications` on a like/match/message/missed-call/report-status/
+    subscription event — needs trigger functions per event, with the exact
+    deep-link `data` jsonb shape the client already parses for
+    new_match/new_message/profile_view; (2) no `fcm_tokens` table and no
+    dispatcher Edge Function exist, so even a `notifications` row never
+    reaches a device — specifies the exact `fcm_tokens` schema/RLS, where to
+    get the Firebase service-account key (Firebase console → Project
+    Settings → Service accounts, love-me-international project), and that it
+    must stay server-side only. Also flags optional realtime on
+    `public:notifications` as a nice-to-have, not required for push itself.
+  - Why: user wants to send backend just the push-notification ask now, get
+    that piece built first, then resume frontend work once it's ready to
+    integrate against.
+  - No code changes this entry — documentation only.
+
+[2026-07-11] Email/transactional-mail backend handoff doc written
+  - New file: `app doctumant/BACKEND_EMAIL_HANDOFF.md` — full audit of every
+    place in the app where a user sends, receives, or is promised an email,
+    written for the backend team as a standalone ask (same pattern as the
+    push-notifications doc).
+  - Findings, by category: (1) sign-up confirmation email is currently OFF
+    project-wide (the 2026-07-06 "Confirm email" dashboard toggle fix noted
+    in an earlier entry) — no user gets a real confirmation email today;
+    (2) `email_verified_screen.dart` is an OTP UI explicitly marked
+    "not wired to a real verification backend" — doc asks backend to choose
+    between a confirmation-link flow vs. a real OTP endpoint pair;
+    (3) password reset itself works via Supabase's default email, but the
+    reset-link deep-link back into the app isn't wired (no custom
+    scheme/App Link registered yet) — flagged as needing coordinated
+    redirect-URL config; (4) `notification_preferences.email_enabled`/
+    `marketing_notifications` columns exist but nothing sends email off them
+    — full pipeline (`send-transactional-email`, `email_send_log`/
+    `email_send_state`, `suppressed_emails`, `email_unsubscribe_tokens`,
+    `handle-email-unsubscribe`) spec'd as optional/lower-priority;
+    (5) two support inboxes are already publicly promised in the app's UI/
+    legal text — `support@loveme-app.com` (Settings) and
+    `lovemedatingappchildsafety@gmail.com` (Child Safety legal pages, with a
+    24h/72h response-time SLA already printed for Play Store Child Safety
+    Standards compliance) — doc asks backend/ops to confirm both are real,
+    monitored mailboxes regardless of any code work; (6) no post-payment
+    receipt email exists or is spec'd anywhere yet, flagged as an open
+    question once real payments land.
+  - Also surfaced during the audit, not part of this doc's scope but worth
+    tracking: `AppConstants.supportEmail` (`app_constants.dart`) is dead code
+    — `settings_screen.dart` hardcodes the same string as a literal instead
+    of referencing it; and `FRONTEND_REMAINING.md`'s claim that all 8
+    notification-preference toggles are wired in Settings is now stale — the
+    current UI only exposes 1 of 8 (a deliberate old-app-parity
+    simplification). Neither touched this session; flagging for a future
+    small cleanup pass.
+  - Why: user wants a dedicated email-integration ask sent to backend,
+    same pattern as the push-notifications doc, based on an exhaustive
+    codebase audit rather than assumptions.
+  - No code changes this entry — documentation only.
+
+[2026-07-11] fcm_tokens write wired (backend confirmed table is live)
+  - Backend team sent a generic "Frontend Integration Guide" that conflicted
+    with our own docs/models in several places (invented `profiles` columns
+    never documented before, a different `active_sessions` shape, a
+    different `fcm_tokens` upsert key, a stale "Next Steps" list claiming
+    likes/matches/messages/calls/storage aren't built — all of which
+    contradicted work already verified live since 2026-07-06→10). Rather
+    than build against an unverified prose doc, wrote
+    `app doctumant/BACKEND_SCHEMA_VERIFICATION_QUESTIONS.md` asking for the
+    actual migration SQL + clarifications. Backend responded confirming:
+    `profiles_viewed_count`/`profiles_viewed_reset_at` and `notify_safety_*`
+    columns exist but have no consumer yet (flagged not-safe-to-use);
+    `is_suspended` etc. exist but nothing sets them (no admin flow yet); the
+    likes/matches/messages/calls/storage "Next Steps" claim was confirmed
+    stale, not a regression; Google OAuth unconfirmed, still don't build
+    against it; and `fcm_tokens`' unique constraint is genuinely on `token`
+    alone (not composite `(user_id, token)`), kept that way deliberately,
+    with an explicit offer to switch if asked.
+  - User asked to request the switch to `(user_id, token)` (safer — a
+    token-alone constraint means a reused/reissued token could silently
+    reassign an existing row to a different user_id on upsert). That ask is
+    a follow-up to send back to backend; NOT yet changed on their end.
+  - Client-side change made now, independent of that follow-up (works
+    correctly against either constraint shape): `fcm_service.dart` — new
+    `_registerToken()` upserts `{user_id, token, platform, updated_at}` onto
+    `fcm_tokens` (`onConflict: 'token'`, matching the constraint as it
+    stands today) whenever a token is first obtained or refreshes; new
+    public `registerTokenForCurrentUser()` re-attempts the write, called
+    from `auth_controller.dart`'s `signIn()`/`signUp()` success paths in
+    case a token was already obtained before the user signed in (fire-and-
+    forget via `unawaited`, doesn't block the auth flow or its state
+    transition).
+  - Result / verification: flutter analyze -> same 4 pre-existing unrelated
+    lint-style infos, nothing new. flutter test -> All tests passed (2,
+    unchanged). Not run on-device — still needs a real login on a physical/
+    emulated device with Play services to confirm a row actually lands in
+    `fcm_tokens`.
+  - Open items / follow-ups: send the `(user_id, token)` constraint-change
+    ask back to backend; once `fcm_tokens` is populated for real users,
+    backend's dispatcher Edge Function (still unconfirmed whether it exists
+    — see BACKEND_SCHEMA_VERIFICATION_QUESTIONS.md §3.4) is the remaining
+    piece before a push notification can actually reach a device.
+
+[2026-07-13] Push notifications — backend delivered, client onConflict fix applied
+  - Backend responded (BACKEND_PUSH_FINAL_STEPS.md reply, dated 2026-07-13)
+    confirming both pieces requested are now live: (1) trigger functions
+    insert a `notifications` row on new_like/new_match/new_message/
+    call_missed/profile_view with the exact `actor_user_id`/`data` shape we
+    asked for (report_update/subscription_* still blocked on `reports`/
+    `subscriptions` tables not existing yet — expected, not a regression);
+    (2) a `send-fcm-push` Edge Function is deployed, triggered on every
+    `notifications` insert, checks `notification_preferences` (push_enabled
+    + per-type toggle) before sending, calls the FCM v1 API per token, and
+    prunes invalid/unregistered tokens automatically.
+  - They also made the `(user_id, token)` constraint change we'd asked for
+    (previously `token` alone) — but this REQUIRED a client fix, not
+    optional: our existing upsert used `onConflict: 'token'`, which now
+    fails outright since that constraint no longer exists (Postgres requires
+    onConflict to name a real constraint). Fixed in `fcm_service.dart`
+    `_registerToken()`: `onConflict: 'user_id,token'`. Updated the class doc
+    comment to reflect the constraint is now `(user_id, token)`, not `token`
+    alone, and that server-side push delivery is live (was previously
+    documented as "still needs to be built").
+  - Result / verification: flutter analyze -> same 4 pre-existing unrelated
+    lint-style infos, nothing new. flutter test -> All tests passed (2,
+    unchanged).
+  - Open items / follow-ups: still NOT run on a real device — backend's own
+    reply asks us to (1) sign in on a real device so a `fcm_tokens` row
+    lands with the new constraint, (2) trigger each event type and confirm
+    a push arrives in foreground/background/killed-app states, (3) report
+    back anything that doesn't arrive so they can check
+    `notifications`/Edge Function logs. This is the next concrete step —
+    needs a physical device or emulator with Play services, not exercised
+    this session. `report_update`/`subscription_expiring`/
+    `subscription_active` notification types remain unavailable until
+    `reports`/`subscriptions` tables exist (tracked separately in
+    BACKEND_REQUIREMENTS_HANDOFF.md).
+
+[2026-07-13] Voice/Video calling — full Agora client built (frontend only)
+  - Feature request: build the complete FRONT-END for voice/video calling
+    using Agora, so the whole flow exists client-side and a detailed backend
+    handoff can be sent. User confirmed two design choices: (a) Agora token
+    minted server-side via a Supabase Edge Function (`get-agora-token`);
+    (b) incoming-call ring signaled via Supabase Realtime on `call_logs`
+    (not FCM-per-call). Both are the recommended options.
+  - Architecture: MEDIA = Agora RTC; SIGNALING = existing `call_logs` table +
+    Supabase Realtime. Ring/accept/decline/end are status transitions on the
+    call row, observed live over realtime; Agora only carries audio/video once
+    both sides join the channel (= the call's UUID).
+  - Packages added (pubspec.yaml): `agora_rtc_engine: ^6.5.0` (resolved 6.5.3),
+    `permission_handler: ^11.3.1` (resolved 11.4.0).
+  - New config: `lib/core/config/agora_config.dart` — `AGORA_APP_ID` via
+    `--dart-define` (public; App Certificate stays server-only), the
+    `get-agora-token` function name, and `isConfigured`. Added an empty
+    `AGORA_APP_ID` define to `.vscode/launch.json` (real id supplied at build).
+  - Model: `shared/models/call_log.dart` EXTENDED — added `channelName`,
+    `callerAgoraUid`, `receiverAgoraUid` (all nullable/defensive so it still
+    reads today's schema), plus `otherUserId()`/`amICaller()` helpers and a
+    docstring for the full status state machine.
+  - Repository: `shared/data/call_repository.dart` REWRITTEN — added
+    `AgoraToken`/`AgoraTokenException`; `startCall` now writes
+    `call_status='ringing'`; added `answerCall`/`declineCall`/`cancelCall`/
+    `markMissed`/`getAgoraToken` (Edge Function invoke)/`getCall`/
+    `subscribeToIncomingCalls` (realtime INSERT filtered to receiver_id) /
+    `subscribeToCall` (realtime UPDATE filtered to the call id). Kept the
+    existing `endCall` (ended_at+ended_by+duration together per the DB
+    constraint) and `getCallHistory`.
+  - Engine wrapper: `lib/core/calls/agora_call_service.dart` (NEW) — owns one
+    `RtcEngine` per call; `ensurePermissions` (mic/camera via
+    permission_handler), `join`/`leave`, `toggleMic`/`toggleCamera`/
+    `switchCamera`/`toggleSpeaker`, and ValueNotifiers for joined/remoteUid/
+    mic/camera/speaker so the UI reacts without a full rebuild.
+  - State machine: `lib/features/calls/call_state.dart` (NEW, CallPhase enum:
+    idle/outgoingRinging/incomingRinging/connecting/connected/ended +
+    CallEndReason) and `call_controller.dart` (NEW, StateNotifier) — drives
+    the whole lifecycle: place call → insert ringing row → 35s ring timeout →
+    missed; on realtime 'answered' both sides fetch a token and join Agora; on
+    remote-join → connected + duration timer; hangUp writes duration/cancels;
+    observes the peer's status changes and remote-leave to tear down. A
+    deterministic local uid (`agoraUidFor`, stable 31-bit hash of user id) is
+    used when the backend doesn't assign `*_agora_uid`. One call at a time.
+  - UI: `lib/features/calls/call_screen.dart` (NEW) — single full-screen
+    surface rendering every phase (outgoing/incoming/connecting/connected
+    audio + video with local PiP preview, end state), brand-styled; controls
+    swap per phase (accept/decline, mute/speaker/camera/flip/end). PopScope
+    blocks back-abandon of a live call. `call_overlay.dart` (NEW) — mounted
+    above the router via MaterialApp.router's `builder`; subscribes to incoming
+    calls whenever auth settles, resolves the caller's name/photo, and pushes
+    CallScreen off the controller's isActive state so a call rings on ANY
+    screen.
+  - Wiring: `features/chat/chat_screen.dart` — the header phone/video buttons
+    now call `_startCall(video:)` (was a "coming soon" toast); resolves the
+    conversation + partner and delegates to the controller.
+    `features/messages/messages_screen.dart` — tapping a row in the Calls tab
+    calls that person back with the same call type. Both guard on
+    `AgoraConfig.isConfigured`.
+  - Android manifest: added INTERNET/ACCESS_NETWORK_STATE/MODIFY_AUDIO_SETTINGS/
+    WAKE_LOCK/BLUETOOTH/BLUETOOTH_CONNECT (CAMERA + RECORD_AUDIO already
+    present, reused for calls).
+  - Backend handoff: `app doctumant/BACKEND_CALLS_HANDOFF.md` (NEW) — the full
+    server-side contract: 3 new `call_logs` columns + channel-name trigger,
+    INSERT/UPDATE RLS, the `get-agora-token` Edge Function request/response
+    shape + token params + auth checks, enabling Realtime on `call_logs`, and
+    an optional `notify_on_missed_call` trigger. Also documents what's out of
+    scope for v1 (native ringing on killed app via FCM/CallKit, group calls,
+    recording — none need TURN since Agora handles transport).
+  - Result / verification: `flutter pub get` clean. `flutter analyze` → same 4
+    pre-existing unrelated infos, ZERO issues in any new call file.
+    `flutter build apk --debug` (with a dummy AGORA_APP_ID) → BUILT
+    successfully (Agora native SDK + permission_handler compiled against a real
+    Android build). `flutter test` → All tests passed (2, unchanged).
+  - Open items / follow-ups: NOT run on a real device — calling needs two
+    physical/emulated devices with mic/camera, a real Agora App ID, and the
+    backend pieces in BACKEND_CALLS_HANDOFF.md (§1-4) live before it works
+    end-to-end. This session is client-only, exactly as requested. Next:
+    hand BACKEND_CALLS_HANDOFF.md to the backend team; once get-agora-token +
+    the columns + realtime are live, do a two-device call test.
+
+[2026-07-13] Contact Support wired to the live send-email function
+  - Backend replied to BACKEND_EMAIL_HANDOFF.md confirming a generic
+    `send-email` Edge Function is deployed (`verify_jwt` on, called via
+    `functions.invoke`, body `{to, subject, html?/text?}`) — a plain mailer,
+    not tied to any table/trigger; an email only goes out when explicitly
+    called. Does not touch auth emails (sign-up confirmation/reset stay on
+    Supabase's own system, still blocked per the 2026-07-06 "Confirm email"
+    toggle note) and isn't gated by `notification_preferences.email_enabled`
+    server-side — client would need to check that itself if desired.
+  - User chose the first concrete use for it: a real "Contact Support" flow
+    from Settings → Help & Support, replacing the dead
+    `support@loveme-app.com` display-only text with an actual working send.
+  - New file: `lib/shared/data/support_email_repository.dart` —
+    `SupportEmailRepository.sendSupportMessage()` calls `send-email` via
+    `functions.invoke`, throws `SendEmailException` with the function's own
+    error message on non-200. Plain `Provider`, no mock variant (no reason
+    to mock a mailer).
+  - `lib/features/settings/settings_screen.dart`: added a "Send us a
+    message" button under the existing Contact Us rows in `_HelpContent`
+    (rows kept as-is, not removed); new `_ContactSupportDialog`
+    (ConsumerStatefulWidget) — subject + message fields, sends via the new
+    repository to `AppConstants.supportEmail`, shows a success snackbar or
+    the function's error message on failure. Along the way, fixed the
+    previously-flagged dead-code `AppConstants.supportEmail` constant — the
+    static contact-email `Text` widget now references it instead of
+    duplicating the literal string.
+  - Result / verification: flutter analyze -> same 4 pre-existing unrelated
+    lint-style infos, nothing new. flutter test -> All tests passed (2,
+    unchanged). Not run on-device — needs a live SMTP-configured environment
+    to confirm an email actually arrives (backend's doc notes a 500 usually
+    means SMTP secrets aren't set for that environment).
+  - Open items / follow-ups: decide whether "Chat on Google Chat" (still
+    static display-only text next to it) should become a real link/flow too,
+    or stay as-is; the child-safety CSAM report dialog
+    (`legal_screen.dart`) still only displays its email address as static
+    text — could get the same treatment if wanted. Auth emails (sign-up
+    confirmation, verification, password-reset deep link) remain open items
+    from BACKEND_EMAIL_HANDOFF.md, untouched by this entry.
+
+[2026-07-13] Sign-up confirmation email — client side of the fix built
+  - User asked to confirm sign-up emails actually work end-to-end; answer
+    was no — "Confirm email" is still disabled server-side (2026-07-06
+    toggle) and the 6-digit OTP screen was always a non-functional mock (see
+    its own doc comment). User chose the simpler of two options: switch to
+    Supabase's standard link-based confirmation (tap a link, no code) rather
+    than building a real OTP send/verify pair.
+  - New file: `app doctumant/BACKEND_CONFIRM_EMAIL_HANDOFF.md` — asks backend
+    to (1) confirm the session-arrival sequencing before flipping "Confirm
+    email" on, (2) register `lovemeinternational://login-callback` as the
+    Redirect URL in Supabase Auth dashboard → URL Configuration, and (3) not
+    flip the toggle until our client fix (below) is deployed, since flipping
+    it first reproduces the exact RLS error that got it disabled originally.
+  - `lib/features/auth/email_verified_screen.dart` REWRITTEN — the fake
+    6-digit code UI is gone; now a plain "Check Your Email" screen (icon,
+    "we sent a link to X", spam-folder note, a real Resend button with a
+    60s cooldown, back-to-login). No code entry — matches how link
+    confirmation actually works. `ConsumerStatefulWidget` now (was
+    StatefulWidget) to call the new controller method below.
+  - `lib/features/auth/auth_controller.dart`:
+    - `signUp()` now returns `Future<sb.AuthResponse>` (was `Future<void>`)
+      so the caller can check `res.session` — null means confirm-email is on
+      and there's nothing to route to except the check-your-email screen.
+      Passes `emailRedirectTo: SupabaseConfig.emailRedirectUrl` explicitly
+      (not just relying on dashboard default).
+    - Profile-row creation logic extracted into `_ensureProfileRowExists()`
+      (insert-if-not-exists on `profiles`+`notification_preferences`) and
+      called from BOTH `signUp()` (immediate-session case, today's reality)
+      AND `_onAuthEvent()` (deferred-session case, once backend flips the
+      toggle) — so the same code path is correct whichever timing is live,
+      without needing a second deployment when backend's toggle changes.
+    - New `resendConfirmationEmail()` — calls `auth.resend(type: signup,
+      emailRedirectTo: ...)`.
+  - `lib/features/auth/auth_screen.dart`: `_submit()` now checks
+    `res.session == null` after sign-up and pushes to
+    `/email-verified?email=<encoded>` explicitly (the router guard can't
+    drive this — there's no session yet to trigger it, and the guard
+    already treats `emailVerified` as a public route so this doesn't
+    conflict). `app_router.dart`'s route for it now reads the `email` query
+    param instead of taking no arguments.
+  - `android/app/src/main/AndroidManifest.xml`: added a second intent-filter
+    on MainActivity for `lovemeinternational://login-callback`
+    (VIEW/DEFAULT/BROWSABLE) — the Supabase Flutter SDK listens for this
+    itself and completes the session exchange automatically; deliberately
+    did NOT add the `app_links` package directly since supabase_flutter
+    already depends on it transitively for this exact purpose.
+  - `lib/core/config/supabase_config.dart`: new `emailRedirectUrl` constant,
+    single source of truth referenced by both the manifest's scheme (must
+    match by hand — documented in a comment) and the auth calls.
+  - Result / verification: flutter analyze -> same 4 pre-existing unrelated
+    lint-style infos, nothing new (confirms `LucideIcons.mailCheck` exists
+    in the installed icon package version). flutter test -> All tests
+    passed (2, unchanged).
+  - Open items / follow-ups: **this cannot go live until backend replies**
+    to BACKEND_CONFIRM_EMAIL_HANDOFF.md and flips "Confirm email" on (after
+    confirming our sequencing question). Not run on-device — needs a real
+    build with the manifest change installed, a real sign-up, and (once
+    backend's toggle is on) tapping the actual emailed link to confirm the
+    deep link reopens the app and completes the session. Until backend
+    flips the toggle, sign-up behaves exactly as before (session returns
+    immediately, `_ensureProfileRowExists` runs inline in `signUp()`) — this
+    is intentionally backward-compatible so shipping this client change
+    early is safe.
+
+[2026-07-13] Consolidated all email asks into one master handoff doc
+  - User wanted a single doc covering everything backend needs to do for
+    email, rather than juggling the two prior docs (BACKEND_EMAIL_HANDOFF.md
+    from 2026-07-11 and BACKEND_CONFIRM_EMAIL_HANDOFF.md from earlier today).
+  - New file: `app doctumant/BACKEND_EMAIL_MASTER_HANDOFF.md` — explicitly
+    supersedes both older docs (they're left in place as historical record,
+    not deleted). Restates what's now confirmed working (Contact Support,
+    password-reset send) up top, then the sign-up-confirmation ask as the
+    main item (redirect-URL allow-list addition, sequencing confirmation,
+    wait-for-go-ahead timing), password-reset deep-link as a flagged
+    follow-up, the two support-inbox ops confirmations, and the lower-
+    priority preference-driven-email/receipt-email asks — same substance as
+    before, just unified and current instead of spread across two docs with
+    some now-stale framing (e.g. the old doc's "decide OTP vs link" question
+    is resolved, so it's stated as a decision made, not a question).
+  - No code changes this entry — documentation only.
+
+[2026-07-13] Diagnosed: push notifications don't show when app is closed
+  - User reported in-app notifications work but "out-of-app" (push) ones
+    don't. Traced through `fcm_service.dart`: `_onForegroundMessage()`
+    (line 85) only debug-prints, and `_onMessageOpenedApp()` only reads
+    `message.data['type']` for tap-routing — the client was written
+    assuming the backend's `send-fcm-push` payload includes a `notification`
+    block (which the Android OS renders automatically, even app-closed) in
+    addition to the `data` block (which only running app code can read).
+    `BACKEND_PUSH_FINAL_STEPS.md` never explicitly specified this payload
+    shape to backend when we asked for the dispatcher — likely gap.
+  - Diagnosis (not yet verified against a live send — no device test done):
+    if `send-fcm-push` is sending a data-only FCM message, Android has
+    nothing to display once the app has no active foreground process,
+    which exactly matches "works when in-app, not otherwise." If it's
+    already sending both blocks, the bug is elsewhere (needs a real device
+    test to isolate further) — flagged this uncertainty in the handoff doc.
+  - New file: `app doctumant/BACKEND_PUSH_PAYLOAD_FIX.md` — asks backend to
+    check `send-fcm-push`'s FCM v1 API call includes both `notification`
+    (title/body, same text already written to the `notifications` row) and
+    `data` (the existing type/payload keys) in the request body, with a
+    concrete before/after JSON example and a verification checklist (send
+    to a device with the app fully closed, confirm the tray notification
+    appears, confirm tapping it still deep-links correctly).
+  - No code changes this entry — this is a backend-side payload fix, not a
+    client bug; client code doesn't need to change to receive a
+    `notification`-block message (the OS handles rendering it directly).
+
+[2026-07-13] Agora calling — reconciled client to backend's confirmed contract
+  - Backend delivered all 4 launch-blocking items from BACKEND_CALLS_HANDOFF.md
+    (their "Agora Voice/Video Calling — Backend Status" doc): `call_logs`
+    columns + channel-name trigger, INSERT/UPDATE RLS (turned out to already
+    exist from 006_chat_rls.sql — no `is_conversation_participant` helper was
+    needed, their INSERT policy inlines the membership check), `get-agora-token`
+    Edge Function (deployed, secrets set), Realtime on `call_logs`, and the
+    `call_missed` notification. They verified schema/trigger/publication/deploy
+    server-side; the first real two-device call is the outstanding e2e test.
+  - Client reconciliation changes:
+    * `call_repository.dart` `getAgoraToken()` — replaced the generic
+      FunctionException message with the backend's exact status-code contract:
+      401 (session expired → sign in again), 404 (call gone), 403 (call no
+      longer ringing/answered → start a fresh call), 500 (temporary), else
+      generic. Also now requires a non-null `token` in the 200 body (backend
+      confirmed a real token is ALWAYS returned in production — App-ID-only/
+      null-token mode isn't used), so a malformed/empty response fails loudly
+      instead of silently joining tokenless.
+    * `call_log.dart` — doc-only: recorded that `channel_name` is now always
+      populated by the server trigger (the `?? id` fallback is belt-and-braces),
+      and that `caller_agora_uid`/`receiver_agora_uid` are INTENTIONALLY left
+      null server-side — the client's deterministic locally-derived uid
+      (`CallController.agoraUidFor`) stays the source of truth, exactly as the
+      existing code already assumed.
+  - No change needed for: the realtime subscriptions (my channel filters match
+    the backend's documented incoming/per-call examples — channel *names* differ
+    but the postgres_changes filters are identical, which is what matters),
+    `functions.invoke` (already attaches the user session token the function
+    requires), `call_type` in the token body (backend accepts-but-ignores it —
+    harmless, left as-is).
+  - Result / verification: `flutter analyze` on the call model + repository +
+    features/calls → No issues found. Not re-run on device (still the pending
+    e2e step, now unblocked: real Agora App ID via --dart-define + two signed-in
+    matched devices → place/ring/answer/connect/end).
+  - Open items / follow-ups: the two-device call test is now the ONLY thing
+    between this and calling working end-to-end. Need the real AGORA_APP_ID
+    from the backend/Agora console to pass via --dart-define at build.
+
+[2026-07-13] Dead support email addresses replaced with the real inbox
+  - Backend replied to BACKEND_EMAIL_MASTER_HANDOFF.md: redirect URL added
+    to the allow-list (done), sequencing confirmed correct (no server-side
+    trigger needed, standard `onAuthStateChange` behavior is right, agreed
+    to wait for our go-ahead before flipping "Confirm email"). But they
+    surfaced a real, more urgent gap: `support@loveme-app.com` and
+    `lovemedatingappchildsafety@gmail.com` — the two addresses shown to
+    users in the app — were **never real, monitored inboxes**. The only
+    actual inbox that exists and is checked is `lovemedating1@gmail.com`,
+    and neither displayed address forwards to it. This means a live,
+    publicly-published 24h/72h CSAE response commitment was pointing at a
+    dead address. Backend correctly flagged this as a client-side fix (no
+    domain/second Gmail account to wire forwarding for) and asked us to
+    prioritize it ahead of the sign-up email work.
+  - Fixed immediately: `lib/core/constants/app_constants.dart` —
+    `supportEmail` changed from `support@loveme-app.com` to the real
+    `lovemedating1@gmail.com`, with a doc comment explaining why (so nobody
+    reverts this by "fixing" it back to the old-looking branded address).
+    `lib/features/legal/legal_screen.dart` — all 3 occurrences of the dead
+    `lovemedatingappchildsafety@gmail.com` (How to Report bullet list, Child
+    Safety Point of Contact section, and the in-app Report CSAM dialog) now
+    reference `AppConstants.supportEmail` via string interpolation instead
+    of a hardcoded literal, so there's exactly one place to change if this
+    address ever changes again. Settings' Contact Us row already referenced
+    the constant (from the earlier Contact Support work), so it picked up
+    the fix automatically without a separate edit.
+  - Result / verification: flutter analyze -> same 4 pre-existing unrelated
+    lint-style infos, nothing new. flutter test -> All tests passed (2,
+    unchanged). Confirmed via grep: zero remaining references to either
+    dead address anywhere in `lib/`.
+  - Open items / follow-ups: reply to backend confirming this shipped; still
+    owe them the password-reset redirect scheme (they're holding that
+    allow-list addition until we send it — not yet registered, separate from
+    the sign-up one which IS done); still waiting on our own go-ahead signal
+    to backend for the "Confirm email" toggle flip (client fix already
+    built per the 2026-07-13 entry above, just needs a deploy + our
+    confirmation message).
+
+[2026-07-13] Presence, device sessions, profile-view recording, real profile-
+detail view — 4 "frontend-only" items wired against already-live tables
+  - Context: a codebase audit identified 8 items that needed no new backend
+    work at all — the tables (`user_presence`, `active_sessions`,
+    `profile_views`) were already live (migration_001.md/migration_002.md)
+    and simply unused by the client. User asked to complete all of them.
+    3 were dropped after investigation (not silently skipped):
+    (1) "Discovery/Privacy settings persistence" — no such controls exist in
+    the current Settings UI at all (the old FRONTEND_REMAINING.md reference
+    predates the UI-parity rewrite, which simplified Settings down to just
+    Worldwide, already real); nothing to wire. (2) "Onboarding multi-photo
+    gallery" — already fully real (3 mandatory photos, each a genuine
+    `profile_photos` insert + `avatars` upload) since the onboarding
+    rebuild; the doc describing it as mock/single-avatar was stale.
+    (3) Ringtone→`profiles.ringtone` write — explicitly asked, then reversed
+    after finding `local_settings_controller.dart`'s own doc comment: a
+    prior pass deliberately moved ringtone to device-local storage only,
+    on the grounds that it describes "how this phone behaves, not the
+    account." Asked the user directly rather than silently re-reversing a
+    documented decision; user confirmed keep it device-local. Also declined
+    to guess-write a `likes.is_super_like` column that the documented schema
+    (migration_002.md) doesn't show existing — asked the user, who chose to
+    leave super-like as a plain like rather than risk a Postgrest column
+    error against an unconfirmed column.
+  - **Presence** (`user_presence`, live, previously unused): new
+    `shared/data/presence_repository.dart` (`SupabasePresenceRepository`,
+    upsert `is_online`/`last_seen`) + `core/presence/presence_service.dart`
+    (`WidgetsBindingObserver`-driven — sets online on app resume, offline on
+    pause/detached, plus a 2-minute foreground heartbeat since there's no
+    server-side staleness sweep yet per
+    BACKEND_SCHEMA_VERIFICATION_QUESTIONS.md §4). Started/stopped from
+    `AuthController` around sign-in/sign-up/session-restore/sign-out (stop
+    runs BEFORE `auth.signOut()` so the RLS-scoped upsert can still resolve
+    `auth.uid()`). Wired into `chat_screen.dart`'s header (real online dot +
+    "Online now"/"Offline" replacing `Profile.isOnline`, which stays local-
+    only/false per its own docstring — presence is looked up separately via
+    the new `presenceForProvider(userId)`, not merged into the Profile model).
+  - **Device sessions** (`active_sessions`, live, previously unused): new
+    `shared/data/device_session_repository.dart`
+    (`SupabaseDeviceSessionRepository`: `registerSession`/`touchSession`/
+    `mySessions`/`revoke`/`revokeAllOthers`) + `core/devices/
+    device_session_registrar.dart` (derives a device label from
+    `Platform.operatingSystem`, registers a session row once per sign-in,
+    exposes the resulting token via the new `currentSessionTokenProvider`).
+    Wired the same 4 auth-controller entry points as presence.
+    `devices_screen.dart` REWRITTEN — `devicesProvider` now reads real rows
+    (was `MockData.devices`); "Sign out of other devices" calls
+    `revokeAllOthers()` for real instead of a local `_revoked` set. **No
+    server-side single-device enforcement exists** (BACKEND_REMAINING.md
+    [BE-1]) — this only makes the screen honest, it does not force another
+    device to actually sign out.
+  - **Profile-view recording** (`profile_views`, live, previously unused):
+    new `shared/data/profile_view_repository.dart`
+    (`SupabaseProfileViewRepository.recordView`, exact insert shape from
+    migration_002.md §5: `{viewer_user_id, viewed_user_id}`, best-effort/
+    silent, no-ops viewing your own profile). Fired once from
+    `ProfilePreviewModal`'s `initState` — the one screen in the app where a
+    user actually looks at someone else's full profile. **No quota
+    enforcement exists server-side** (`record_profile_view` RPC doesn't
+    exist, BACKEND_REQUIREMENTS_HANDOFF.md §1.3) — this only logs the view.
+  - **Profile-detail view**: `ProfilePreviewModal` (shared by Likes/Explore)
+    REWRITTEN from a small fixed-height bottom sheet into a
+    `DraggableScrollableSheet`-hosted full detail view: a real multi-photo
+    gallery (reuses Discover's `cardPhotosProvider`/`profile_photos`, with
+    tap-left/right paging + segmented progress bars, matching Discover's
+    card carousel) plus every profile field (bio, marital status,
+    orientation, interested-in, hobbies). Discover's "Show more" chip
+    (previously its own separate, hobbies-only partial sheet, `_showMore`,
+    now deleted) opens this same shared modal instead of a second, thinner
+    UI — one profile-detail surface across Discover/Likes/Explore.
+  - Also fixed, unrelated to this feature but blocking any Android build:
+    `flutter_local_notifications` (added earlier for FCM foreground
+    notifications) needs core library desugaring, which was never enabled —
+    `android/app/build.gradle.kts` now sets
+    `isCoreLibraryDesugaringEnabled = true` +
+    `coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")`.
+    Without this every debug/release build failed at the Gradle step
+    regardless of any Dart change.
+  - Result / verification: `flutter analyze` → same baseline (4 pre-existing
+    infos + 1 new info in the same null-aware-marker style in
+    `device_session_repository.dart`), zero errors/warnings anywhere.
+    `flutter test` → All tests passed (2, unchanged). `flutter build apk
+    --debug` (with the real Agora App ID) → BUILT successfully after the
+    desugaring fix. Not run on-device — presence/sessions/view-recording all
+    need a live signed-in session to exercise meaningfully.
+  - Open items / follow-ups: `ProfileTile` (Likes/Explore grids) still shows
+    `Profile.isOnline` (always false/local-only) rather than real presence —
+    it's a plain `StatelessWidget` with no `ref` access, so wiring it needs
+    either a `ConsumerWidget` conversion or threading presence in from each
+    caller; deferred as out of the originally-scoped 8 items. Device-session
+    "revoke" and presence are both honest-but-unenforced until backend ships
+    [BE-1]'s single-device trigger and a staleness sweep.
+
+2026-07-14 — FULL-APP AUDIT + LAUNCH TIER LIST (planning session, no code
+changed). User asked for a ground-truth pass through the entire app (frontend
++ backend, excluding subscription/payments which is deliberately deferred to
+last) and a prioritized tier list to execute line-by-line across future
+sessions. Ran a fresh Explore-agent audit against actual code (not just this
+log's own prior claims) covering: all `app doctumant/*HANDOFF*`/`*REMAINING*`
+docs, a TODO/FIXME/"coming soon" grep across `lib/`, moderate-image/payment
+grep, Agora calls code, package-rename completeness, Firebase file presence,
+and iOS touch history. Findings that update or correct prior entries:
+  - **Android package rename is COMPLETE**, not half-done — despite git status
+    showing the old `MainActivity.kt` as deleted and a new untracked
+    `com/loveme/` folder, the actual path is
+    `android/app/src/main/kotlin/com/loveme/international/MainActivity.kt`,
+    `com.loveme.international` is consistent everywhere (namespace,
+    applicationId, manifest), and the old `com/example` tree no longer exists
+    at all. The git-status ambiguity was just uncommitted work, not a stuck
+    migration.
+  - **Firebase (Android) is real and present**: `google-services.json` +
+    `firebase.json` + `lib/firebase_options.dart` all exist and are
+    non-placeholder (dated 2026-07-11), consistent with FCM push already
+    working in dev builds.
+  - **iOS is confirmed completely untouched** — `ios/` exists from the initial
+    scaffold commit only; zero iOS-specific commits since; bundle id is still
+    the templated placeholder; no `GoogleService-Info.plist`; no Agora
+    mic/camera usage strings. Full iOS pass (bundle id rename, Firebase iOS
+    config, Info.plist usage strings, physical-device build) is still 100%
+    outstanding whenever iOS work starts.
+  - **Payments confirmed 100% mock**: zero payment SDK dependencies in
+    `pubspec.yaml`; zero Razorpay/Stripe/PayPal/Wise code; the entire
+    "purchase" flow in `subscription_screen.dart` is a `Future.delayed(900ms)`
+    that flips a local `StateProvider<bool>`. Per user instruction, left out
+    of the tier list below — will be tackled as its own pass at the end.
+  - **`moderate-image` (NSFW/human gate) confirmed still fully absent**,
+    client and server side — this is the most consistently-flagged blocker
+    across every backend handoff doc and remains the top non-payment risk
+    before any real user-uploaded photo can be trusted live.
+  - Two items previously logged as "done, pending one retest" are still
+    genuinely open, not closed: (a) signup confirmation email — "Confirm
+    email" is still OFF in the Supabase dashboard and the redirect URL is
+    still not in the allow-list, so no real user has ever received a
+    confirmation email end-to-end; (b) push notifications — client-side
+    Android notification-channel bug was fixed, but the doc chain ends before
+    a confirmed "app fully closed" retest from backend.
+  - Calling (Agora) is code-complete with no TODOs in any call file, but a
+    real two-device call has *never* been run — this is the single largest
+    "probably works, unverified" gap in the app.
+  - Test coverage is effectively nil: 2 unit tests in the whole project. No
+    `flutter build apk --release` has ever been logged, only `--debug`.
+
+**LAUNCH TIER LIST (subscription/payments intentionally excluded — separate
+final pass per user instruction).** Full detail also mirrored into
+CLAUDE.md's "Current state" section so a fresh session/chat has the same
+picture without re-reading this log. Tiers are ordered by
+blocking-severity × cross-cutting-impact, not by size — S-tier items are the
+things nothing else can be safely verified without.
+
+- **S-TIER — verify the ground truth (do first, costs almost nothing):**
+  1. Run `flutter analyze` + `flutter test` fresh and confirm they're still
+     clean (baseline drifts silently otherwise).
+  2. Do the never-yet-done **live `flutter run` walkthrough on a real
+     Android device/emulator** — sign-up→onboarding→Discover→like/match→
+     chat→call→notifications→presence→device sessions. Nearly every backend
+     module in this app has been "verified" via analyze/test/build only,
+     never actually exercised as a user. This single session will surface
+     more real bugs than anything else on this list.
+  3. Confirm in Supabase dashboard whether "Confirm email" is on/off and
+     whether the redirect URL allow-list was updated (BACKEND_CONFIRM_EMAIL
+     _HANDOFF.md) — resolve this either way before more auth work.
+
+- **A-TIER — safety/trust blockers (must exist before any real user data is
+  live):**
+  4. `moderate-image` Edge Function (NSFW/human-photo gate) — backend build,
+     the most repeatedly-flagged launch blocker in every handoff doc.
+  5. `reports` + `blocked_users` tables + RLS (backend) — Safety/Report
+     screen is currently a dead end (404s); block/report menu items in chat
+     are no-ops.
+  6. Account deletion — currently a client no-op; needs a real backend path
+     (RPC or Edge Function) that actually removes/anonymizes the account.
+  7. Quota-enforcement RPCs (`record_profile_view` and equivalent for
+     likes/24h) — free-tier caps are currently unenforced client-side
+     decoration only.
+
+- **B-TIER — core product loops that are still mocked or half-wired:**
+  8. Real discovery feed — Discover still serves `MockData.profiles` (5
+     fake profiles); needs the real candidate-query backend + client swap.
+  9. Explore screen — still fully mocked (country chips/grid).
+  10. Two-device Agora call test — code is complete, just never run
+      end-to-end; do this alongside item 2's device walkthrough.
+  11. Push notification final retest — confirm a push arrives with the app
+      fully closed/killed, on a real device.
+  12. `ProfileTile` (Likes/Explore grids) presence wiring — needs converting
+      to `ConsumerWidget` so real online/offline shows instead of the
+      always-false local flag.
+  13. Extended profile fields (bio, interests, occupation, etc.) — currently
+      local-only with no backing columns; decide which are worth a real
+      migration.
+
+- **C-TIER — polish / smaller gaps:**
+  14. Chat: emoji picker (no-op), edit/delete message (repo methods exist,
+      unused in UI), typing indicator (missing).
+  15. Onboarding "current location" GPS step — reportedly faked; verify and
+      wire real geolocation if still true.
+  16. Refund Policy legal copy — the one legal page not yet transcribed from
+      a real old-app screenshot.
+  17. Ringtone preview — 3 tones currently play the same system sound;
+      needs 3 real audio assets if distinct previews matter.
+  18. `BACKEND_SCHEMA_VERIFICATION_QUESTIONS.md` — thread appears to have
+      gone unanswered; needs a follow-up round with backend.
+  19. Release signing — release APKs are debug-signed; needs a real
+      keystore + signing config before any Play Store upload.
+  20. iOS — entire platform untouched (bundle id, Firebase iOS config,
+      Info.plist usage strings, first device build); scope as its own
+      multi-session track whenever iOS work starts.
+
+- **FINAL TIER (explicitly deferred, do last per user instruction):**
+  21. Subscription/payments — plan tiers are locked (Basic+/Gold/Platinum/
+      Premium Elite/VIP Elite) but zero payment SDK is integrated; the
+      entire purchase flow is a mock delay-and-flip-a-bool. Needs a real
+      payment provider decision + backend integration before this can ship.
+
+Next step: work top-down starting at S-TIER item 1, one line at a time, per
+user instruction ("go through every single thing and complete it line by
+line").
+
+2026-07-14 — A-TIER FRONTEND COMPLETE (safety/trust blockers) + backend
+handoff doc. User asked to skip straight to A-TIER (safety/trust blockers)
+and build 100% of the frontend for it, then produce a detailed backend
+handoff doc covering everything backend needs to build to make it live.
+Subscription/payments untouched (deliberately last, per standing
+instruction). All 4 A-TIER items now have complete, merged client code:
+
+- **Reports** — `lib/shared/models/safety_report.dart` REWRITTEN
+  (`reportedUserId` FK + `ReportReason` 6-value enum + `fromJson`, was a
+  display-only mock shape with no wire format). NEW
+  `lib/shared/data/safety_repository.dart` (`SupabaseSafetyRepository`):
+  `submitReport()`/`myReports()` against a `reports` table that **does not
+  exist server-side yet** — catches Postgrest `42P01`/`PGRST205` and throws
+  `SafetyFeatureUnavailableException`, which `safetyReportsProvider`
+  (rewritten off `MockData.reports`, now deleted) turns into an empty list
+  rather than an error screen. NEW shared
+  `lib/shared/widgets/report_user_sheet.dart` — reason-chips + optional
+  description + "also block" checkbox, the one report-submission surface
+  used from: Discover's "Report" chip (`discover_screen.dart`, was a
+  `_toast('...soon')` no-op), the chat safety modal's "Report & Block"
+  (`chat_screen.dart`, was `Navigator.pop` no-op), and a new report icon on
+  the shared profile-detail preview modal (`profile_preview_modal.dart`,
+  had no report entry point at all before).
+- **Blocking** — NEW `lib/shared/models/blocked_user.dart` +
+  `SafetyRepository.blockUser()`/`unblockUser()`/`myBlockedUsers()`/
+  `hasBlocked()` against a `blocked_users` table (also not live yet, same
+  fallback pattern). This is distinct from the existing
+  `matches.status='blocked'` (`MatchRepository.block()`, already live but
+  scoped to an existing match) — `blocked_users` also covers blocking
+  straight from Discover. NEW `lib/features/safety/blocked_users_screen.dart`
+  (list + unblock), reachable from a new "Blocked Users" row on
+  `profile_screen.dart`'s rows card, route `/blocked-users` added to
+  `route_paths.dart`/`app_router.dart`. Chat safety modal's "Block" action
+  now calls `blockUser()` for real (was a no-op `Navigator.pop`).
+- **Account deletion** — `AuthController.deleteAccount()` (NEW method,
+  `auth_controller.dart`) invokes a `delete-account` Edge Function (doesn't
+  exist server-side yet) then reuses the exact same teardown as `signOut()`
+  — no duplicate sign-out logic. `delete_account_screen.dart`'s
+  `_confirmAndDelete()` REWRITTEN off its `Future.delayed(900ms)` mock to
+  call it for real, catching `FunctionException` (404 → "not available yet"
+  messaging, distinct from a generic retry message on any other failure).
+- **Quota enforcement** — `AppConstants.dailyLikeCap`/`monthlyFreeViewCap`
+  (both existed, both unenforced since Phase 1) are now wired to 4 proposed
+  RPCs, all gracefully no-op until backend ships them:
+  `swipe_repository.dart`'s `likeProfile()` gained a pre-flight
+  `can_send_like` RPC call (swallows any error other than an explicit
+  `false` result — today's behavior is unchanged) + new
+  `DailyLikeCapExceededException` + `remainingLikesToday()` (reads
+  `get_like_quota`, returns `null` = unlimited/unknown if the RPC is
+  missing). `profile_view_repository.dart`'s `recordView()` now prefers a
+  `record_profile_view` RPC (atomic insert + quota check) and falls back to
+  the old silent direct insert if that RPC doesn't exist — zero-risk change.
+  New `remainingLikesTodayProvider`/`remainingViewsThisMonthProvider` in
+  `repositories.dart`. `discover_screen.dart`'s `_like`/`_superLike` catch
+  `DailyLikeCapExceededException` and show an upgrade-prompt dialog
+  (dismissed like/super-like is un-dismissed so the card stays). Added a
+  real `_usageCard` to `subscription_screen.dart` (there were no existing
+  hardcoded "34/50" usage bars to replace, despite FRONTEND_REMAINING.md §8
+  claiming otherwise — that description was already stale) showing real
+  likes-today/views-this-month progress bars, hidden behind a `null`
+  (premium/RPC-missing) check rather than fabricating numbers.
+- **Image moderation status** — `lib/shared/models/profile_photo.dart`
+  gained `PhotoModerationStatus` enum (`pending`/`approved`/`rejected`) +
+  `ProfilePhoto.moderationStatus`, defaulting to `approved` when the
+  `moderation_status` column is absent from the JSON (fully backward
+  compatible — every existing photo keeps behaving exactly as before).
+  `profile_screen.dart`'s `_profileCard` now watches `myPhotosProvider` and
+  shows a small badge under the avatar ("Photo under review" /
+  "Photo rejected — please update it") when the primary photo isn't
+  `approved` — invisible today since the column doesn't exist yet and
+  everything defaults to `approved`. This is UI-only; the actual
+  `moderate-image` NSFW scan itself is entirely a backend build (see
+  handoff doc §5) — the on-device ML-Kit face check
+  (`photo_picker_service.dart`) only ever rejected photos with no
+  detectable face and was never a moderation substitute.
+- **NEW `app doctumant/BACKEND_ATIER_HANDOFF.md`** — the full backend
+  contract for all 5 items above (reports, blocking, account deletion, 4
+  quota RPCs, image moderation), with exact schema/RLS/wire-shape/Edge
+  Function specs, a TL;DR table, and 2 open questions flagged for backend
+  to weigh in on (whether blocked users should be filtered server-side out
+  of Discover/likes/matches, §2.5; whether a pending/rejected photo should
+  be hidden from other users while awaiting moderation, §5.5) plus a
+  recommended ship order (reports/blocking → quota RPCs → account deletion
+  → image moderation last, since that one needs a third-party classifier
+  decision).
+- Verified: `flutter analyze` → same 5 pre-existing style infos, zero new
+  errors/warnings. `flutter test` → All tests passed (2, unchanged).
+  `flutter build apk --debug` → BUILT successfully. Not run on-device — none
+  of the 5 backend pieces exist yet, so live end-to-end testing isn't
+  possible until backend ships at least one of them.
+- Next: hand `BACKEND_ATIER_HANDOFF.md` to the backend team; once any piece
+  ships, the corresponding client feature works with **no further client
+  changes** (that was the explicit design goal of every fallback above).
+  After A-TIER, proceed to B-TIER per the launch tier list.
+
+2026-07-14 — BACKEND REPLIED TO A-TIER HANDOFF; VERIFIED, ONE REAL GAP
+FOUND + FIXED, ONE GAP SENT BACK. Backend responded same-day with
+`app doctumant/Safety.Trust Backend.md`: migrations 029-034 + 2 Edge
+Functions (`delete-account`, `moderate-image`) built (not yet deployed to
+the live project). Rather than taking "done" at face value, cross-checked
+their reply against the actual client code:
+
+- **§1 reports, §4 quota RPCs — confirmed genuinely done**, no client
+  changes needed, matches spec exactly.
+- **§3 account deletion — confirmed done, but found a real bug while
+  verifying.** Backend's design call (anonymize a deleted user's messages
+  by nulling `sender_id` rather than deleting the row, so the other
+  participant keeps their history) is sound, but it makes `sender_id ==
+  null` a newly-reachable state — and `lib/shared/models/message.dart`'s
+  `ChatMessage.senderId` was still a non-nullable `String`, so
+  `ChatMessage.fromJson()` would have **thrown** the first time it hit a
+  real orphaned message. Fixed: `senderId` is now `String?`; `isMine()`
+  treats `null` as "not mine" (safe default, renders as a normal
+  other-party bubble); `chat_screen.dart`'s `_bubble()` now shows a small
+  "Deleted user" italic label above any message with a null sender so it
+  isn't confused with a message from the (still-present) other
+  participant. `flutter analyze` reverified clean after the fix (same 5
+  pre-existing infos, zero new issues).
+- **§2 blocked-users — schema/RLS confirmed done, but the filtering fix is
+  DEAD ON ARRIVAL for this client.** Backend patched
+  `get_discover_profiles()`/`get_matches()`/`get_chat_list()` (RPCs from
+  `013_rpc_functions.sql`) to exclude blocked pairs. Checked the actual
+  repository code: `SupabaseProfileRepository.discoverFeed()`,
+  `SupabaseMatchRepository.myMatches()`, and
+  `SupabaseConversationRepository.conversationsForMe()` all query
+  `profiles`/`matches`/`conversations` **directly** — none of them ever
+  call those 3 RPCs (a deliberate earlier client decision, predating
+  blocking entirely; `discoverFeed()`'s own docstring says "no server-side
+  discovery/ranking RPC yet"). Net effect: blocking someone today would
+  NOT actually hide them from Discover/matches/chat — backend's filter is
+  attached to a code path this client doesn't use. Did not silently accept
+  this or paper over it client-side without asking — sent it back.
+- **New `app doctumant/ATIER_FOLLOWUP_TO_BACKEND.md`** — reply to backend
+  covering: (1) the blocked-users filtering mismatch above, asking them to
+  re-target the filter onto the underlying tables/RLS instead of the 3
+  RPCs (more robust anyway — works regardless of client query path), or
+  tell us if a view + small client swap is preferred; (2) confirms the
+  `senderId` bug is already fixed client-side, §3 fully closed once `034`
+  runs; (3) per user decision, confirms "leave conversations orphaned" (not
+  hard-delete) for account deletion; (4) per user decision, asks backend to
+  actually build the chat-media storage cleanup they'd flagged as a gap
+  (enumerate the deleting user's conversations before deletion, clean up
+  `chat-images`/`chat-files`/`chat-file-thumbs`/`voice-messages` objects for
+  them) rather than deferring it; (5) confirms no issue with the
+  `record_profile_view` return-type change (`void`→`json`) — client was
+  already coded against the `json` contract from the original handoff doc.
+- **A-TIER is NOT yet fully closed.** §1/§4 are done. §3 is done pending
+  `034` deploy. §2's table/RLS half is done but its filtering half needs a
+  backend correction before blocking actually works end-to-end. §5 remains
+  intentionally infra-only pending a classifier choice (no timeline
+  pressure, per original doc). Next: wait for backend's reply to
+  `ATIER_FOLLOWUP_TO_BACKEND.md`, specifically confirmation that blocking
+  filtering has been re-targeted correctly, before declaring A-TIER done
+  and moving to B-TIER.
+
+2026-07-14 — BACKEND'S A-TIER FOLLOW-UP REPLY: ONE CLIENT CHANGE MADE,
+ONE DECISION MADE, A-TIER NEARLY CLOSED. Backend replied to
+`ATIER_FOLLOWUP_TO_BACKEND.md` same-day with
+`app doctumant/a-tierfollow up.md`:
+- **Blocked-users filtering (§1 of their reply) — fixed and deployed,
+  `035_blocked_users_table_level_gating.sql`.** Split two ways: `matches`
+  and `conversations` got the `blocked_users` exclusion folded directly
+  into their existing owner-scoped RLS SELECT policies — **zero client
+  change**, `SupabaseMatchRepository.myMatches()` and
+  `SupabaseConversationRepository.conversationsForMe()` now honor blocks
+  automatically since they already query those tables directly. `profiles`
+  itself was deliberately left unfiltered (it's intentionally open for
+  legitimate non-Discover reasons — viewing a blocked user's own profile
+  page, the Blocked Users screen listing their name/photo) — instead
+  backend added a `security_invoker` view, `profiles_discoverable`, that
+  mirrors their existing `get_discover_profiles()` RPC's exclusion logic
+  (self/suspended/already-liked/passed/matched) plus the same
+  either-direction `blocked_users` exclusion. **Made the one client change
+  this needed**: `SupabaseProfileRepository.discoverFeed()`
+  (`lib/shared/data/repositories.dart`) now selects from
+  `profiles_discoverable` instead of `profiles` — same columns/shape, kept
+  the existing already-swiped client-side exclusion as a harmless
+  defensive no-op. `flutter analyze` clean (same 5 pre-existing infos),
+  `flutter test` green (2, unchanged).
+- **Chat-media storage cleanup (§4 of our ask) — backend found a real
+  conflict and flagged it back instead of guessing.** Cleaning up
+  `chat-images`/`chat-files`/`chat-file-thumbs`/`voice-messages` objects on
+  account deletion would leave the message *row* intact (per the already-
+  agreed "leave orphaned" design) but render as a broken image/video/audio
+  icon once its file is gone — worse than the current "Deleted user" label
+  implies (that label design assumes the content is still there, just
+  unattributed). Backend proposed two paths and explicitly asked rather
+  than picking one unilaterally: (1) keep media, drop the cleanup ask
+  entirely (zero risk, zero new work, orphaned-media storage cost
+  accumulates over time); (2) build a new removed-media-placeholder flag
+  (needs both a new backend signal — client can't infer "gone because
+  owner deleted their account" vs. "gone for any other reason" from
+  `sender_id = null` alone — and a client rendering change). **User chose
+  option 1** — keep media, no cleanup, no placeholder-flag work. This
+  reverses nothing already agreed; it just declines the extra cleanup we'd
+  asked for last round once its real cost (broken media icons) was made
+  visible.
+- **New `app doctumant/ATIER_CLOSEOUT_TO_BACKEND.md`** — confirms both of
+  the above to backend: the `discoverFeed()` swap is done/merged/verified;
+  the media decision is "keep media, drop cleanup," so `delete-account`
+  needs no further backend change. Also flags honestly that end-to-end
+  blocking has been verified **by code inspection, not by running the app**
+  — no live Supabase session exists in this environment to actually create
+  two accounts, block one, and confirm it disappears from Discover/matches/
+  chat. That real verification is folded into the S-TIER "run the app on a
+  real device" item already on the launch tier list, not treated as a new
+  separate ask.
+- **A-TIER status: all 5 items now have complete, correct client+backend
+  work by design/inspection.** The only remaining gap before calling it
+  fully closed is the live-device walkthrough (S-TIER item 2) — once that
+  specifically confirms blocking works end-to-end for real, A-TIER is done
+  and B-TIER can start. No further backend asks outstanding.
+
+2026-07-14 — B-TIER FRONTEND STARTED + DONE (4 of 6 items; 2 are manual
+device tests, out of scope for this pass). User asked to move to B-TIER
+next (real discovery feed, Explore, ProfileTile presence wiring, extended
+profile fields — the other 2 B-TIER items, the two-device Agora call test
+and the push-notification "app fully closed" retest, are manual verification
+tasks with no code to write, left for the user to run). Before writing any
+code, re-verified the actual current state against `repositories.dart`
+rather than trusting `BACKEND_REMAINING.md`/`FRONTEND_REMAINING.md`, which
+both still say Discover "serves 5 hardcoded mock profiles" — **that's
+stale**: `discoverFeed()` already queries the real `profiles_discoverable`
+view (since the A-TIER blocking work). The real B-TIER gap was ranking/geo/
+pagination, plus `byCountry()`/Explore's country counts (genuinely still
+mock), not "wire up real data from scratch."
+- **Discovery feed — distance calc added, byCountry() made real.** New
+  `lib/core/utils/geo_distance.dart` (plain Haversine great-circle calc, no
+  new dependency) — `discoverFeed()`/`byCountry()` now fill in
+  `Profile.distanceKm` by comparing the current user's own captured
+  `location_lat`/`location_lng` (real GPS from onboarding) against each
+  candidate's, returning `null` (hidden, not fabricated) when either side
+  lacks a location. Previously `distanceKm` was always `null` for any real
+  profile — only mock data had a hardcoded distance, so the "X km away"
+  chip and the distance filter silently did nothing for real users.
+  `byCountry()` REWRITTEN off `MockData.profiles` filtered locally to a real
+  `profiles_discoverable` query filtered by `country`, same distance-fill.
+- **Explore — real per-country counts, real profile grid.** New
+  `ProfileRepository.countryCounts()` (RPC-first against a proposed
+  `get_country_counts()`, falling back to a client-side paged aggregate
+  over `profiles_discoverable` if that RPC doesn't exist yet — never
+  fabricates a count) + `countryCountsProvider`. `explore_screen.dart`
+  REWRITTEN to read real counts instead of `MockData.countries`'s 8
+  hardcoded countries with fake counts (1240/3180/etc., now deleted from
+  `mock_data.dart` since nothing real reads it anymore — `MockProfileRepository`
+  keeps its own copy for the unused mock-swap-back path). New
+  `lib/core/utils/country_flags.dart` (flag-emoji lookup by name, decorative
+  only, falls back to 🌍 for unknown countries) since flags no longer come
+  bundled with a fixed country list.
+- **`ProfileTile` — was dead code, now wired for real with real presence.**
+  Confirmed via Explore agent: `ProfileTile` was defined but never
+  instantiated anywhere in `lib/` — Likes and the old Explore both used
+  their own inline row/card widgets. Converted `ProfileTile` from
+  `StatelessWidget` to `ConsumerWidget` reading `presenceForProvider(userId)`
+  for the online dot (was `profile.isOnline`, an always-false local-only
+  field) and wired it into Explore's country-user-list bottom sheet as a
+  real 2-column grid (previously a `ListTile` list) — the first live call
+  site `ProfileTile` has ever had. Left the Likes screen's inline
+  `_likeRow` alone (deliberate horizontal-list UI matching the old app per
+  an earlier UI-parity decision, not a bug to fix here).
+- **Extended profile fields — `bio`/`interests` promoted from local-only to
+  real, `occupation` added.** `lib/shared/models/profile.dart`: `bio`/
+  `interests` now round-trip through `fromJson`/`toInsertJson` (previously
+  local-only, never sent to/read from Supabase); new `occupation` field
+  added the same way. `ProfileRepository.updateMyProfile()` signature
+  extended with `bio`/`interests`/`occupation` (all optional, existing call
+  sites unaffected). `profile_screen.dart`'s `_EditProfileSheet` REWRITTEN:
+  restores a Bio field (an earlier session removed it because it "saved
+  nothing" — now it actually does), adds Occupation + a comma-separated
+  Interests field (capped at `AppConstants.maxInterests`). The profile card
+  and the shared `ProfilePreviewModal` (other users' profile-detail view)
+  both now display occupation/bio/interests when non-empty, matching the
+  existing "hide empty fields, never fabricate" convention. Roadmap fields
+  beyond these 3 (education/religion/languages/height/lifestyle/etc.)
+  deliberately NOT wired this pass — flagged in the handoff doc as needing
+  a product confirmation on scope before adding more columns.
+- **New `app doctumant/BACKEND_BTIER_HANDOFF.md`** — full backend contract
+  for `get_country_counts()` RPC, the optional `get_discover_profiles()`
+  ranking RPC (flagged as needing a product decision on whether real
+  ranking is even in scope before building), and the `profiles.bio`/
+  `interests`/`occupation` columns. Explicitly flags the extended-profile
+  columns as the one item that ISN'T a graceful no-degrade — a missing
+  `bio` column makes `updateMyProfile()` throw (Postgrest errors on an
+  unknown column), unlike the two RPCs which fail silently — recommends
+  backend prioritize that schema change first.
+- Verified: `flutter analyze` → same baseline (8 total infos: the 5
+  pre-existing + 3 new in the identical null-aware-marker style already
+  accepted elsewhere in this file), zero errors/warnings. `flutter test` →
+  All tests passed (2, unchanged). `flutter build apk --debug` → BUILT
+  successfully. Not run on-device.
+- **B-TIER status: 4 of 6 items frontend-complete, backend contract
+  written.** Remaining 2 items (two-device Agora call test, push
+  "app fully closed" retest) are manual device-verification tasks with no
+  associated code change — left for the user to run whenever convenient,
+  not blocking the rest of B-TIER. Next: hand `BACKEND_BTIER_HANDOFF.md` to
+  backend; after that, proceed to C-TIER per the launch tier list.
+
+2026-07-14 — BACKEND DELIVERED B-TIER; ONE CLIENT CALL-SITE RENAME, THEN
+CLOSED. Backend replied same-day with `app doctumant/B-TIER Backend
+Response.md`: migrations `036`-`039` all deployed to the live project.
+- **§3 extended profile columns (`036_extended_profile_fields.sql`) — done,
+  exact spec.** `bio`/`interests`/`occupation` added to `profiles` with the
+  same 500-char bio cap the client already enforces. No RLS change needed
+  (row-level, not column-level). This was flagged as the one item that
+  WOULD throw a save error until shipped (unlike the graceful-degradation
+  RPCs) — confirmed fixed now that the columns exist.
+- **§1 `get_country_counts()` (`037_country_counts.sql`) — done, exact
+  spec.** Same name/shape/`security_invoker` choice as proposed.
+  `countryCountsProvider`'s RPC-first path now returns real numbers with no
+  client change needed.
+- **§2 discovery pagination — done, but under a different name than
+  proposed, requiring one client change.** Backend's honesty here is worth
+  recording: they initially built exactly what was asked
+  (`038_discover_pagination.sql`, an overloaded `get_discover_profiles(int,
+  int)` alongside the pre-existing 0-arg `get_discover_profiles()` from
+  `013_rpc_functions.sql`). That broke the existing 0-arg function —
+  PostgREST couldn't disambiguate an empty-body RPC call between the two
+  overloads (`PGRST203`), erroring on *both*, not just the new one. Backend
+  caught this via their own live smoke test before telling the client team,
+  and shipped a same-day fix: `039_fix_discover_profiles_overload_ambiguity.sql`
+  drops the broken overload and re-adds the identical pagination logic
+  under a new name, `get_discover_profiles_page(p_limit, p_offset)`. Left
+  `038` in the migration history unmodified (bug and all) rather than
+  rewriting it, so the history matches what was actually deployed at each
+  point — a good practice worth noting.
+  **Client change made**: `SupabaseProfileRepository.discoverFeed()`
+  (`lib/shared/data/repositories.dart`) now calls
+  `rpc('get_discover_profiles_page', params: {'p_limit': 100, 'p_offset': 0})`
+  instead of the old plain `.from('profiles_discoverable').select()...`
+  query. Since the RPC returns `setof profiles_discoverable` (same
+  `security_invoker` view already used for A-TIER's blocking work), all the
+  self/suspended/already-liked/passed/matched/blocked exclusion now happens
+  server-side — the client-side `.neq('user_id', myId)`/`.eq('profile_complete',
+  true)` filtering was removed as redundant; only the defensive
+  already-swiped check (for same-session timing lag) and the client-side
+  `GeoDistance` fill-in remain.
+- **§4 PostGIS — not started, as expected** (client's own doc said "not
+  requested for this pass").
+- Verified: `flutter analyze` → same baseline (8 infos, all pre-existing
+  style, zero new). `flutter test` → All tests passed (2, unchanged).
+- **B-TIER is now fully closed** — all 4 backend-dependent items (country
+  counts, discovery pagination, extended profile columns, distance) are
+  live end-to-end; the 2 manual device-test items remain the user's to run
+  whenever convenient but don't block calling B-TIER done. Next: C-TIER per
+  the launch tier list.
+
+2026-07-14 — C-TIER: 3 OF 4 CHAT ITEMS WERE ALREADY DONE (STALE TIER LIST),
+TYPING INDICATOR BUILT FOR REAL. User asked to move to C-TIER next
+(chat emoji picker/edit/delete/typing-indicator, onboarding GPS
+verification — the other C-TIER items, Refund Policy copy, ringtone audio,
+release signing, iOS track, and the schema-verification-questions
+follow-up, were explicitly scoped out of this pass per user decision, since
+they're content/ops tasks rather than frontend code). Before writing
+anything, ran an Explore pass against the actual `chat_screen.dart`/
+`chat_repository.dart`/`message.dart`/`location_service.dart` code rather
+than trusting CLAUDE.md's C-TIER description — this caught a second
+instance of stale tier-list claims (after B-TIER's Discover correction):
+- **Emoji picker — already fully built, not missing.** Two separate
+  pickers exist: a 20-emoji inline reaction picker (`+` per bubble) and a
+  48-emoji composer picker (😊 icon, inserts at cursor). Both hand-rolled,
+  no third-party package, already wired to the live `message_reactions`
+  table.
+- **Edit message — already fully built, not missing.** Long-press menu on
+  own text messages → dialog → `ChatRepository.editMessage()` → real
+  `messages.is_edited`/`edited_at` columns (migration 005_chat.sql).
+- **Delete message — already fully built, not missing.** Same long-press
+  menu → confirm dialog → soft-delete via `is_deleted`/`deleted_at`,
+  `getMessages()` already filters deleted rows server-side.
+- **Onboarding GPS — verified genuinely real, not faked.**
+  `lib/core/location/location_service.dart` calls the actual `geolocator`
+  plugin for real, with proper service-disabled/permission-denied error
+  handling, and persists the real fix to `profiles.location_lat/lng/
+  accuracy_m`. Nothing to fix.
+So of the 4 items CLAUDE.md listed as "chat emoji picker/edit/delete/
+typing-indicator," only **typing indicator** was actually missing —
+confirmed via grep that no backend doc anywhere (migration docs,
+BACKEND_REMAINING.md) mentions a typing indicator at all: no table, no
+column, no RPC. This needed a fresh design, not just wiring an existing
+plan.
+- **Typing indicator — built using Supabase Realtime Broadcast, not a new
+  table.** Chose Broadcast (ephemeral pub/sub over a WebSocket channel)
+  over a `typing_indicators` table + Postgres Changes, since a typing
+  signal has no reason to be persisted — no schema migration needed at
+  all, only a possible Realtime Authorization config check (see the
+  handoff doc). `lib/shared/data/chat_repository.dart`: new
+  `ChatRepository.broadcastTyping(conversationId)` /
+  `subscribeToTyping(conversationId, onTyping)`, implemented via
+  `sendBroadcastMessage`/`onBroadcast` on a per-conversation channel named
+  `typing:<conversationId>`; self-echo (broadcast delivers to the sender
+  too) filtered client-side by comparing the payload's `user_id` against
+  the current user. `lib/features/chat/chat_screen.dart`: `_onComposerChanged()`
+  (leading-edge debounce — broadcasts immediately then ignores further
+  calls for 3s so it's not one broadcast per keystroke) wired to the
+  message `TextField`'s `onChanged`; `subscribeToTyping` wired alongside
+  the existing message-realtime subscription in `_subscribe()`, with a
+  4-second silence timeout clearing the indicator (broadcast has no
+  explicit "stopped typing" event by design). Chat header's subtitle now
+  shows "Typing…" in place of "Online now"/"Offline" while active.
+- **New `app doctumant/BACKEND_CTIER_HANDOFF.md`** — documents all of the
+  above, including the correction that 3 of 4 listed chat items were
+  already done, and asks backend to confirm one thing: whether this
+  project has Realtime Authorization (private channels) turned on — if
+  not (the common default), this feature needs literally zero backend
+  action and should already work end-to-end against the live project.
+- Verified: `flutter analyze` → same baseline (8 infos, all pre-existing
+  style, zero new). `flutter test` → All tests passed (2, unchanged).
+  `flutter build apk --debug` → BUILT successfully. Not run on-device — a
+  typing indicator specifically needs two live sessions in the same
+  conversation to see it fire, same caveat as every other realtime feature
+  in this app.
+- **C-TIER (code items) status: fully done pending backend's one
+  confirmation.** Remaining C-TIER items (Refund Policy copy, ringtone
+  audio, release signing, iOS track, schema-verification follow-up) were
+  explicitly out of scope for this pass — they need user-supplied content/
+  assets/decisions, not more frontend code, and were left for a future
+  pass or the user's own judgment call on priority.
+
+2026-07-15 — FULL GROUND-TRUTH AUDIT (post A/B/C-TIER) + IDENTITY
+VERIFICATION BUILT FOR REAL. User asked for a fresh audit of what's
+genuinely left, having just completed A/B/C-TIER — explicitly ruled iOS
+out of scope going forward (Android-only target, confirmed by user). Ran
+an Explore pass verifying claims against actual code rather than trusting
+CLAUDE.md (proven stale twice already, in B-TIER and C-TIER). Findings:
+  - Zero real test coverage (still just 1 file, 2 trivial `AuthState` unit
+    tests) — flagged as the single biggest quality risk, not fixed this
+    session (user chose to prioritize verification instead).
+  - Android release signing — still debug-signed, TODO comment
+    unchanged. Not fixed this session (needs a real keystore, user's call
+    on timing).
+  - `BACKEND_SCHEMA_VERIFICATION_QUESTIONS.md` — confirmed still
+    unanswered since 2026-07-11. Not re-sent this session.
+  - **Identity verification had no backend review pipeline — this was
+    picked as the one item to fix this session**, and turned out to be a
+    real bug, not just a missing feature: uploads were going to the
+    **public** `avatars` bucket (meant for profile photos), meaning ID
+    documents/selfies could have been publicly reachable via URL if any
+    real user had gone through the flow. Status was also purely
+    `setState`-local — closing the screen lost all progress, and
+    `profiles.is_verified` (the real, live, already-everywhere-else-used
+    verified-badge column) was never actually read to reflect the outcome.
+  - A "calling shows 'not available'" flag from the automated scan turned
+    out to be a false alarm on manual verification — `AgoraConfig.isConfigured`
+    correctly gates this on whether a real Agora App ID was passed at
+    build time; the toast only fires in unconfigured builds, exactly as
+    designed. No fix needed.
+  - Settings screen toggles, subscription mock state, admin-screen removal,
+    MockData usage — all confirmed as expected/already-correct, no action.
+- **Identity verification — rebuilt for real.** NEW
+  `lib/shared/models/verification_request.dart` (`VerificationDocType`
+  4-value enum, `VerificationStatus`, `fromJson`). NEW
+  `lib/shared/data/verification_repository.dart`
+  (`SupabaseVerificationRepository`): `uploadDocument()` to a new private
+  `verification-documents` bucket (NOT `avatars`), `submitRequest()`
+  inserting into a proposed `verification_requests` table, `myLatestRequest()`.
+  Catches missing-table/missing-bucket errors into
+  `VerificationFeatureUnavailableException` → "not available yet" UI,
+  same graceful-degradation pattern as every A/B/C-tier feature.
+  `lib/core/media/photo_picker_service.dart`: new
+  `pickVerificationDocument()` (no face-check — a scanned ID legitimately
+  may not have a clean face crop, unlike the selfie step which still uses
+  the existing face-checked `pickProfilePhoto()`).
+  `lib/features/settings/settings_screen.dart`: `_verificationCard()` now
+  reads real status (`myVerificationRequestProvider`) and shows "Verified"
+  (from the authoritative `profiles.is_verified`, not the request's own
+  status)/"Under review"/"Rejected — resubmit"/"Not verified"; `_VerificationFlow`
+  rewritten to a real 3-step flow (doc type → upload document → upload
+  selfie → submit) that persists across sessions instead of resetting on
+  navigation, and allows resubmission after a rejection.
+  `lib/shared/data/repositories.dart`: `verificationRepositoryProvider`,
+  `myVerificationRequestProvider`.
+- **New `app doctumant/BACKEND_VERIFICATION_HANDOFF.md`** — full backend
+  contract: `verification_requests` table + RLS (insert/select-own only,
+  status/review fields admin-only), the new private `verification-documents`
+  bucket + upload-only-to-own-path-prefix policy (explicitly no client
+  SELECT policy — only a reviewer/admin context should ever read these
+  back), and an explicit callout that approving a request must also flip
+  `profiles.is_verified` in the same action, since that's the column the
+  rest of the app actually reads for the verified badge — the request's
+  own `status` column is only for showing the submitter their own review
+  outcome.
+- Verified: `flutter analyze` → same baseline (8 infos, all pre-existing
+  style, zero new). `flutter test` → All tests passed (2, unchanged).
+  `flutter build apk --debug` → BUILT successfully. Not run on-device —
+  needs the real bucket/table to exercise the full submit-and-see-status
+  round trip meaningfully.
+- Next: hand `BACKEND_VERIFICATION_HANDOFF.md` to backend. Remaining known
+  gaps after this: zero real test coverage, Android release signing, and
+  the unanswered schema-verification thread — all flagged, none fixed this
+  session, all the user's call on when to prioritize. iOS confirmed
+  out of scope going forward per explicit user decision.
+
+2026-07-15 — BACKEND CONFIRMED VERIFICATION LIVE; STARTING FINAL TIER
+(SUBSCRIPTION/PAYMENTS). Backend replied same-day confirming
+`verification_requests` (migration `040`) and the private
+`verification-documents` bucket (migration `041`) are both built and
+deployed to the live project, matching the handoff doc's spec exactly —
+no deviations, no client changes needed. One thing they flagged for
+confirmation (not a deviation): that `uploadDocument()` never calls
+`getPublicUrl()`/`createSignedUrl()` against the new bucket as a leftover
+from the old `avatars`-bucket code path, since that bucket deliberately
+has no SELECT policy for any client role — confirmed true by re-reading
+`lib/shared/data/verification_repository.dart`'s `uploadDocument()`,
+which only ever returns the raw object path, never attempts to resolve a
+URL. Backend explicitly scoped the approval/review pipeline as NOT built
+(matches the handoff doc's own scoping) — every submission sits at
+`pending` until an admin flips `status`/`is_verified` by hand; flagged as
+a future priority, not a blocker.
+
+User then asked to start the FINAL TIER — subscription/payments — the
+one item deliberately deferred until everything else was done. User
+supplied the real, locked plan-tier pricing table (5 tiers: Basic+ $5/650
+KES, Gold $10/1300 KES, Platinum $15/1950 KES, Premium Elite $20/2600 KES,
+VIP Elite $25/3250 KES, each with a `profiles_limit`/`likes_visible` cap
+and a Google Play product ID per tier, e.g. `basic_plus_monthly`) and
+asked for real Google Play Billing integration. (A pasted "Bug #7 — Voice
+Reminder" backend doc referencing an unrelated project — routes like
+`/api/reminders/voice/parse`, files like `app/voice-reminder.tsx` — was
+identified as not belonging to this codebase at all and discarded per
+user confirmation; Love Me International has no voice-reminder feature.)
+Beginning the real billing integration pass now — see the next entry for
+what was built.
+
+2026-07-15 — FINAL TIER: REAL GOOGLE PLAY BILLING BUILT (client-side
+complete). Added `in_app_purchase` (official Flutter-team package,
+`in_app_purchase_android` platform impl) — the only new dependency this
+pass needed. Kept the pre-existing mock M-PESA button and dead-end Wise
+receipt-upload button unchanged, per explicit user decision (both payment
+paths may still be wanted later; neither is replaced or removed).
+- **`SubscriptionPlan` model** — added `googlePlayProductId` (locked
+  values: `basic_plus_monthly`/`gold_monthly`/`platinum_monthly`/
+  `premium_elite_monthly`/`vip_elite_monthly`) and `likesVisible`.
+  `mock_data.dart`'s 5-tier plan list updated to match the user's real
+  pricing table exactly — also corrected Premium Elite's profile/likes cap
+  from the old placeholder 2,000 to the real 2,500.
+- **`Profile` model** — new `planId` field (`profiles.plan_id`, proposed
+  column, read-only from the client — only `verify-purchase` sets it
+  server-side, never a direct client PATCH). Read via `fromJson`, excluded
+  from `toInsertJson`/`updateMyProfile` on purpose.
+- **`isPremiumProvider` — found and fixed a real wiring gap while building
+  this.** It was a bare `StateProvider<bool>` defaulting to `false`,
+  completely disconnected from the real, already-live
+  `profiles.is_premium` column — the old mock subscription flow's
+  "activation" was just flipping this local flag, and every premium gate
+  across Discover/Likes/Profile/Settings read only from it, never from the
+  real column. Now a derived `Provider<bool>` reading
+  `currentUserProvider`'s `isPremium` — same 5 call sites (Discover,
+  Likes, Profile, Settings, Subscription) work unchanged since they only
+  ever did `ref.watch(isPremiumProvider)` (a plain bool read), but now
+  backed by real data instead of a settable mock.
+- **`lib/core/billing/billing_service.dart`** (NEW) — thin wrapper around
+  `InAppPurchase.instance`: `isAvailable()`, `queryProducts()` (throws
+  `ProductNotFoundException` if a Play Console listing is missing),
+  `buySubscription()`, `completePurchase()`, `restorePurchases()`,
+  exposes `purchaseStream`. Never verifies a purchase itself — that
+  requires the Google Play Developer API server-side only.
+- **`lib/shared/data/purchase_repository.dart`** (NEW) —
+  `SupabasePurchaseRepository.verifyPurchase()` invokes a proposed
+  `verify-purchase` Edge Function with `{plan_id, product_id,
+  purchase_token}`, expects `{plan_id, premium_until}` back. Maps a 404 to
+  `PurchaseFeatureUnavailableException` ("not available yet"), any other
+  non-2xx to `PurchaseVerificationException` (surfaces the backend's own
+  `message`).
+- **`subscription_screen.dart` — rewritten for real billing.** On init,
+  subscribes to `purchaseStream` (once, held for the widget's lifetime)
+  and queries live Play prices for all 5 products (falls back to the
+  static USD price display if a listing isn't found/live yet — common
+  during development before Play Console propagation). Each non-current
+  plan card gets a real "Subscribe" button (only rendered once product
+  query resolves) that launches the actual Play purchase sheet. Purchase
+  results arrive asynchronously via the stream: a `purchased`/`restored`
+  status triggers `verifyPurchase()`, and — regardless of verification
+  outcome — always calls `completePurchase()` afterward, since an
+  unacknowledged purchase is re-delivered by the Billing Library on every
+  app start otherwise (would otherwise retry a permanently-rejected
+  purchase forever). On verified success, invalidates `currentUserProvider`
+  so the real plan/premium status shows immediately. The renewal banner
+  and "CURRENT" plan ribbon now read the real `Profile.planId`/
+  `premiumUntil` instead of a hardcoded `'gold'`/"Gold Plan" string.
+- Android: added `com.android.vending.BILLING` permission to
+  `AndroidManifest.xml` — required for `BillingClient` to connect at all;
+  build would have silently failed to find any products without it.
+- Verified: `flutter analyze` → same baseline (8 infos, all pre-existing
+  style, zero new — clean across all new billing code). `flutter test` →
+  All tests passed (2, unchanged). `flutter build apk --debug` → BUILT
+  successfully (Play Billing library compiles alongside Agora/ML
+  Kit/Firebase natives with no conflicts). Not run on-device — needs a
+  real Play Console listing with the 5 products configured, a signed
+  build uploaded to at least an internal-testing track, and a real backend
+  `verify-purchase` function to exercise the full purchase→premium round
+  trip meaningfully (Google Play Billing does not work against debug/
+  unsigned builds side-loaded outside the Play Store).
+- **New `app doctumant/BACKEND_PAYMENTS_HANDOFF.md`** — full backend
+  contract: the `profiles.plan_id` column, the `verify-purchase` Edge
+  Function (exact request/response shape, the Google Play Developer API
+  verification steps including the easy-to-miss "must acknowledge the
+  purchase within ~3 days or Google auto-refunds it" requirement, a
+  recommended `purchases` table for token-replay-across-accounts
+  prevention), and Real-Time Developer Notifications (RTDN) as a
+  recommended-but-not-blocking follow-up for renewals/cancellations/
+  refunds (flagged clearly: without it, a user who cancels via the Play
+  Store directly will keep `is_premium=true` until their `premium_until`
+  naturally lapses, since nothing else re-verifies on a schedule).
+- **FINAL TIER status: client-side billing integration fully built,
+  blocked on backend shipping §1 (schema) + §2 (Edge Function) before any
+  real purchase can be verified and premium actually granted.** This
+  closes out the last item on the original A/B/C/Final tier list — every
+  planned feature area has now had a frontend pass; remaining known gaps
+  are the pre-existing ones (zero real test coverage, Android release
+  signing, the unanswered schema-verification thread) plus whatever
+  backend delivers/flags in response to this doc.
+

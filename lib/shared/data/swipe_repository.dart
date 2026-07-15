@@ -15,12 +15,26 @@ abstract interface class SwipeRepository {
   Future<void> passProfile(String toUserId);
   Future<void> unlikeProfile(String toUserId);
   Future<Set<String>> getSwipedUserIds();
+
+  /// Remaining likes in the current free-tier 24h window, or `null` if the
+  /// user is premium (unlimited) / the quota RPC isn't available. Backed by
+  /// the `can_send_like` RPC proposed in `BACKEND_ATIER_HANDOFF.md` §4 —
+  /// returns `null` today since that RPC doesn't exist yet ([BE-10]).
+  Future<int?> remainingLikesToday();
 }
 
 /// Thrown when the server rejects a swipe because it was already recorded
 /// (`likes`/`passes` unique violation, Postgres code 23505).
 class AlreadySwipedException implements Exception {
   const AlreadySwipedException();
+}
+
+/// Thrown when the free-tier daily like cap (50/24h, `AppConstants.dailyLikeCap`)
+/// has been reached — surfaced by the `can_send_like` RPC proposed in
+/// `BACKEND_ATIER_HANDOFF.md` §4. Not reachable today since that RPC doesn't
+/// exist server-side yet ([BE-10]); reserved for when it ships.
+class DailyLikeCapExceededException implements Exception {
+  const DailyLikeCapExceededException();
 }
 
 class SupabaseSwipeRepository implements SwipeRepository {
@@ -32,12 +46,43 @@ class SupabaseSwipeRepository implements SwipeRepository {
   Future<void> likeProfile(String toUserId) async {
     final myId = _client.auth.currentUser!.id;
     try {
-      await _client
-          .from('likes')
-          .insert({'from_user_id': myId, 'to_user_id': toUserId});
+      // Pre-flight quota check via the proposed `can_send_like` RPC (see
+      // BACKEND_ATIER_HANDOFF.md §4). Swallows any error other than an
+      // explicit `false` result — if the RPC doesn't exist yet (today), this
+      // silently no-ops and the insert below proceeds unguarded, same as
+      // before this quota work landed.
+      try {
+        final allowed = await _client.rpc('can_send_like');
+        if (allowed == false) throw const DailyLikeCapExceededException();
+      } on DailyLikeCapExceededException {
+        rethrow;
+      } catch (_) {
+        // RPC missing/erroring — fall through, no client-side gate.
+      }
+      await _client.from('likes').insert({
+        'from_user_id': myId,
+        'to_user_id': toUserId,
+      });
     } on sb.PostgrestException catch (e) {
       if (e.code == '23505') throw const AlreadySwipedException();
       rethrow;
+    }
+  }
+
+  /// Reads the remaining-likes count from the proposed `get_like_quota` RPC
+  /// (`BACKEND_ATIER_HANDOFF.md` §4). Returns `null` (unknown/unlimited) if
+  /// the RPC doesn't exist yet — callers should hide quota UI in that case
+  /// rather than show a fabricated number.
+  @override
+  Future<int?> remainingLikesToday() async {
+    try {
+      final result = await _client.rpc('get_like_quota');
+      if (result is Map && result['remaining'] != null) {
+        return result['remaining'] as int;
+      }
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -45,9 +90,10 @@ class SupabaseSwipeRepository implements SwipeRepository {
   Future<void> passProfile(String toUserId) async {
     final myId = _client.auth.currentUser!.id;
     try {
-      await _client
-          .from('passes')
-          .insert({'from_user_id': myId, 'to_user_id': toUserId});
+      await _client.from('passes').insert({
+        'from_user_id': myId,
+        'to_user_id': toUserId,
+      });
     } on sb.PostgrestException catch (e) {
       if (e.code == '23505') throw const AlreadySwipedException();
       rethrow;

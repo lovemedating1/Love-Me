@@ -1,19 +1,24 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
+import '../../core/config/agora_config.dart';
 import '../../core/media/photo_picker_service.dart';
 import '../../core/media/photo_source_sheet.dart';
 import '../../core/media/voice_recorder_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../calls/call_controller.dart';
 import '../../core/theme/app_gradients.dart';
 import '../../core/utils/date_format.dart';
 import '../../shared/data/repositories.dart';
 import '../../shared/models/message.dart';
 import '../../shared/models/message_reaction.dart';
 import '../../shared/widgets/app_avatar.dart';
+import '../../shared/widgets/report_user_sheet.dart';
 import '../../shared/widgets/state_views.dart';
 import '../../shared/widgets/sub_page_header.dart';
 
@@ -41,22 +46,80 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 /// The old app's 20-emoji inline reaction picker (was a 6-emoji bottom sheet).
 const _kReactionEmojis = [
-  '❤️', '😂', '😮', '😢', '👍', '🔥',
-  '😍', '😘', '🥰', '😊', '😉', '👏',
-  '🎉', '💯', '🙏', '😢', '😡', '👀',
-  '💔', '✨',
+  '❤️',
+  '😂',
+  '😮',
+  '😢',
+  '👍',
+  '🔥',
+  '😍',
+  '😘',
+  '🥰',
+  '😊',
+  '😉',
+  '👏',
+  '🎉',
+  '💯',
+  '🙏',
+  '😢',
+  '😡',
+  '👀',
+  '💔',
+  '✨',
 ];
 
 /// Standard emoji set for the composer's 😊 picker — inserted into the
 /// message text, not attached as a reaction, so it's a broader everyday set
 /// rather than the reaction picker's expressive-face-focused list.
 const _kComposerEmojis = [
-  '😀', '😁', '😂', '🤣', '😊', '😍', '😘', '😉',
-  '😎', '🤗', '🤔', '😅', '😢', '😭', '😡', '😴',
-  '🥰', '😇', '🙃', '🤩', '😋', '😜', '🥳', '😬',
-  '👍', '👎', '👏', '🙏', '💪', '👋', '✌️', '🤞',
-  '❤️', '🧡', '💛', '💚', '💙', '💜', '💔', '💯',
-  '🔥', '✨', '🎉', '🌹', '💐', '🍕', '☕', '🍷',
+  '😀',
+  '😁',
+  '😂',
+  '🤣',
+  '😊',
+  '😍',
+  '😘',
+  '😉',
+  '😎',
+  '🤗',
+  '🤔',
+  '😅',
+  '😢',
+  '😭',
+  '😡',
+  '😴',
+  '🥰',
+  '😇',
+  '🙃',
+  '🤩',
+  '😋',
+  '😜',
+  '🥳',
+  '😬',
+  '👍',
+  '👎',
+  '👏',
+  '🙏',
+  '💪',
+  '👋',
+  '✌️',
+  '🤞',
+  '❤️',
+  '🧡',
+  '💛',
+  '💚',
+  '💙',
+  '💜',
+  '💔',
+  '💯',
+  '🔥',
+  '✨',
+  '🎉',
+  '🌹',
+  '💐',
+  '🍕',
+  '☕',
+  '🍷',
 ];
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
@@ -74,17 +137,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// Message ids we've already submitted a read-receipt for this session.
   final Set<String> _markedRead = {};
 
+  // ---- Typing indicator (Realtime Broadcast — ephemeral, no table) -------
+  RealtimeChannel? _typingChannel;
+  bool _partnerTyping = false;
+  Timer? _partnerTypingTimeout;
+  Timer? _typingDebounce;
+
   @override
   void dispose() {
     _input.dispose();
     _scroll.dispose();
     _channel?.unsubscribe();
+    _typingChannel?.unsubscribe();
+    _partnerTypingTimeout?.cancel();
+    _typingDebounce?.cancel();
     super.dispose();
   }
 
   void _subscribe(String conversationId) {
     if (_subscribedConversationId == conversationId) return;
     _channel?.unsubscribe();
+    _typingChannel?.unsubscribe();
     _subscribedConversationId = conversationId;
     _channel = ref.read(chatRepositoryProvider).subscribeToMessages(
       conversationId,
@@ -96,6 +169,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _markIncomingRead(conversationId);
       },
     );
+    _typingChannel = ref.read(chatRepositoryProvider).subscribeToTyping(
+      conversationId,
+      () {
+        if (!mounted) return;
+        setState(() => _partnerTyping = true);
+        // Broadcast is fire-and-forget with no explicit "stopped typing"
+        // event — clear the indicator if no further broadcast arrives
+        // within a few seconds of silence.
+        _partnerTypingTimeout?.cancel();
+        _partnerTypingTimeout = Timer(const Duration(seconds: 4), () {
+          if (mounted) setState(() => _partnerTyping = false);
+        });
+      },
+    );
+  }
+
+  /// Debounces outgoing typing broadcasts so we don't send one per
+  /// keystroke — leading-edge debounce: broadcasts immediately, then
+  /// ignores further calls until the 3s timer lapses (the timer's callback
+  /// does nothing; its only job is marking itself inactive after 3s so the
+  /// next keystroke is allowed through).
+  void _onComposerChanged(String conversationId) {
+    if (_typingDebounce?.isActive ?? false) return;
+    _typingDebounce = Timer(const Duration(seconds: 3), () {});
+    ref.read(chatRepositoryProvider).broadcastTyping(conversationId);
   }
 
   /// Marks every message from the other participant as read. Safe to call
@@ -130,8 +228,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -139,11 +240,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _toast(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(msg),
-        backgroundColor: error ? AppColors.destructive : AppColors.pink,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: error ? AppColors.destructive : AppColors.pink,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   Future<void> _send(String conversationId) async {
@@ -176,12 +279,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final picker = ref.read(photoPickerServiceProvider);
       final repo = ref.read(chatRepositoryProvider);
       final media = await picker.pickChatImage(source);
-      final up = await repo.uploadChatImage(conversationId, media.bytes,
-          fileExtension: media.fileExtension);
+      final up = await repo.uploadChatImage(
+        conversationId,
+        media.bytes,
+        fileExtension: media.fileExtension,
+      );
       final sent = await repo.sendMediaMessage(
-          conversationId: conversationId,
-          type: MessageType.image,
-          mediaUrl: up.mediaPath);
+        conversationId: conversationId,
+        type: MessageType.image,
+        mediaUrl: up.mediaPath,
+      );
       _appendSent(sent);
     } on PhotoPickCancelled {
       // No-op.
@@ -211,13 +318,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (mounted) _toast('Could not process that video.', error: true);
         return;
       }
-      final up = await repo.uploadChatVideo(conversationId, media.bytes,
-          fileExtension: media.fileExtension, thumbnailBytes: thumb);
+      final up = await repo.uploadChatVideo(
+        conversationId,
+        media.bytes,
+        fileExtension: media.fileExtension,
+        thumbnailBytes: thumb,
+      );
       final sent = await repo.sendMediaMessage(
-          conversationId: conversationId,
-          type: MessageType.video,
-          mediaUrl: up.mediaPath,
-          thumbnailUrl: up.thumbnailPath);
+        conversationId: conversationId,
+        type: MessageType.video,
+        mediaUrl: up.mediaPath,
+        thumbnailUrl: up.thumbnailPath,
+      );
       _appendSent(sent);
     } on PhotoPickCancelled {
       // No-op.
@@ -257,12 +369,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         return;
       }
       final repo = ref.read(chatRepositoryProvider);
-      final up = await repo.uploadVoice(conversationId, voice.bytes,
-          fileExtension: voice.fileExtension);
+      final up = await repo.uploadVoice(
+        conversationId,
+        voice.bytes,
+        fileExtension: voice.fileExtension,
+      );
       final sent = await repo.sendMediaMessage(
-          conversationId: conversationId,
-          type: MessageType.audio,
-          mediaUrl: up.mediaPath);
+        conversationId: conversationId,
+        type: MessageType.audio,
+        mediaUrl: up.mediaPath,
+      );
       _appendSent(sent);
     } on MediaUploadException catch (e) {
       if (mounted) _toast(e.message, error: true);
@@ -278,12 +394,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _toggleReactionPicker(String messageId) {
-    setState(() =>
-        _reactionPickerFor = _reactionPickerFor == messageId ? null : messageId);
+    setState(
+      () => _reactionPickerFor = _reactionPickerFor == messageId
+          ? null
+          : messageId,
+    );
   }
 
   Future<void> _pickReaction(
-      ChatMessage m, String emoji, String conversationId) async {
+    ChatMessage m,
+    String emoji,
+    String conversationId,
+  ) async {
     setState(() => _reactionPickerFor = null);
     try {
       await ref.read(chatRepositoryProvider).addReaction(m.id, emoji);
@@ -321,9 +443,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(LucideIcons.trash2, color: AppColors.destructive),
-              title: const Text('Delete message',
-                  style: TextStyle(color: AppColors.destructive)),
+              leading: const Icon(
+                LucideIcons.trash2,
+                color: AppColors.destructive,
+              ),
+              title: const Text(
+                'Delete message',
+                style: TextStyle(color: AppColors.destructive),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _deleteMessage(m, conversationId);
@@ -349,7 +476,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
             child: const Text('Save'),
@@ -397,10 +526,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         content: const Text('This cannot be undone.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.destructive),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.destructive,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -460,13 +592,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() {});
   }
 
-  void _callToast(String kind) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text('$kind call — coming soon.'),
-        behavior: SnackBarBehavior.floating,
-      ));
+  /// Places a voice/video call to this partner. Needs the conversation to
+  /// exist (every active match auto-gets one) — if it hasn't propagated yet,
+  /// we surface a gentle "setting up" toast rather than failing silently.
+  Future<void> _startCall({required bool video, String? partnerName}) async {
+    if (!AgoraConfig.isConfigured) {
+      _toast('Calling is not available in this build.', error: true);
+      return;
+    }
+    final convo = ref
+        .read(conversationForPartnerProvider(widget.partnerId))
+        .valueOrNull;
+    if (convo == null) {
+      _toast('Setting up your chat… try again in a moment.');
+      ref.invalidate(conversationForPartnerProvider(widget.partnerId));
+      return;
+    }
+    final partner = ref.read(profileByIdProvider(widget.partnerId)).valueOrNull;
+    await ref
+        .read(callControllerProvider.notifier)
+        .placeCall(
+          conversationId: convo.id,
+          partnerId: widget.partnerId,
+          partnerName: partnerName ?? partner?.name ?? 'Unknown',
+          partnerPhotoUrl: partner?.photoUrl,
+          video: video,
+        );
+    // The CallOverlay pushes the full-screen call surface off the controller
+    // state; nothing else to do here.
   }
 
   void _safetyModal(String? partnerName) {
@@ -484,11 +637,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 const Icon(LucideIcons.shield, color: AppColors.pink, size: 22),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(name,
-                      style: Theme.of(ctx)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  child: Text(
+                    name,
+                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -498,7 +652,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               icon: LucideIcons.ban,
               title: 'Block $name',
               subtitle: 'They will no longer be able to contact you.',
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                Navigator.pop(ctx);
+                _blockPartner(name);
+              },
             ),
             const SizedBox(height: 10),
             _safetyCard(
@@ -507,12 +664,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               title: 'Report & Block',
               subtitle: 'Block them and send a report to our safety team.',
               destructive: true,
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                Navigator.pop(ctx);
+                ReportUserSheet.show(
+                  context,
+                  reportedUserId: widget.partnerId,
+                  reportedName: name,
+                  preselectBlock: true,
+                );
+              },
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _blockPartner(String name) async {
+    try {
+      await ref
+          .read(safetyRepositoryProvider)
+          .blockUser(blockedUserId: widget.partnerId, blockedName: name);
+      ref.invalidate(blockedUsersProvider);
+      if (mounted) _toast('$name has been blocked.');
+    } on SafetyFeatureUnavailableException {
+      if (mounted) _toast('Blocking isn\'t available yet.', error: true);
+    } catch (_) {
+      if (mounted) _toast('Could not block — try again.', error: true);
+    }
   }
 
   Widget _safetyCard(
@@ -523,8 +702,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     required VoidCallback onTap,
     bool destructive = false,
   }) {
-    final color =
-        destructive ? AppColors.destructive : Theme.of(context).colorScheme.onSurface;
+    final color = destructive
+        ? AppColors.destructive
+        : Theme.of(context).colorScheme.onSurface;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -545,9 +725,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: color)),
-                    Text(subtitle,
-                        style: const TextStyle(color: AppColors.mutedFg, fontSize: 12)),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppColors.mutedFg,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -561,8 +752,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final partner = ref.watch(profileByIdProvider(widget.partnerId));
-    final conversation = ref.watch(conversationForPartnerProvider(widget.partnerId));
+    final conversation = ref.watch(
+      conversationForPartnerProvider(widget.partnerId),
+    );
     final p = partner.valueOrNull;
+    // Real `user_presence` row — null (unknown) until the partner has ever
+    // had one written; treated as offline for display, not "unknown".
+    final presence = ref
+        .watch(presenceForProvider(widget.partnerId))
+        .valueOrNull;
+    final isOnline = presence?.isOnline ?? false;
 
     return Scaffold(
       appBar: PreferredSize(
@@ -585,7 +784,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     Stack(
                       children: [
                         AppAvatar(photoUrl: p?.photoUrl, size: 40),
-                        if (p?.isOnline ?? false)
+                        if (isOnline)
                           Positioned(
                             right: 0,
                             bottom: 0,
@@ -595,7 +794,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               decoration: BoxDecoration(
                                 color: AppColors.online,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
                               ),
                             ),
                           ),
@@ -607,32 +809,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(p?.name ?? 'Chat',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16)),
-                          Text((p?.isOnline ?? false) ? 'Online now' : 'Offline',
-                              style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                          Text(
+                            p?.name ?? 'Chat',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            _partnerTyping
+                                ? 'Typing…'
+                                : (isOnline ? 'Online now' : 'Offline'),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     CircleIconButton(
-                        icon: LucideIcons.phone,
-                        tooltip: 'Voice call',
-                        onTap: () => _callToast('Voice')),
+                      icon: LucideIcons.phone,
+                      tooltip: 'Voice call',
+                      onTap: () =>
+                          _startCall(video: false, partnerName: p?.name),
+                    ),
                     const SizedBox(width: 6),
                     CircleIconButton(
-                        icon: LucideIcons.video,
-                        tooltip: 'Video call',
-                        onTap: () => _callToast('Video')),
+                      icon: LucideIcons.video,
+                      tooltip: 'Video call',
+                      onTap: () =>
+                          _startCall(video: true, partnerName: p?.name),
+                    ),
                     const SizedBox(width: 6),
                     CircleIconButton(
-                        icon: LucideIcons.shield,
-                        tooltip: 'Safety',
-                        onTap: () => _safetyModal(p?.name)),
+                      icon: LucideIcons.shield,
+                      tooltip: 'Safety',
+                      onTap: () => _safetyModal(p?.name),
+                    ),
                   ],
                 ),
               ),
@@ -643,9 +860,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: conversation.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => ErrorView(
-            message: 'Could not load this conversation.',
-            onRetry: () =>
-                ref.invalidate(conversationForPartnerProvider(widget.partnerId))),
+          message: 'Could not load this conversation.',
+          onRetry: () =>
+              ref.invalidate(conversationForPartnerProvider(widget.partnerId)),
+        ),
         data: (convo) {
           if (convo == null) {
             // Every active match now auto-gets a conversation (live trigger),
@@ -656,7 +874,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               message: 'Setting up your chat…',
               actionLabel: 'Retry',
               onAction: () => ref.invalidate(
-                  conversationForPartnerProvider(widget.partnerId)),
+                conversationForPartnerProvider(widget.partnerId),
+              ),
             );
           }
           _subscribe(convo.id);
@@ -671,21 +890,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             children: [
               Expanded(
                 child: messages.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (_, _) => ErrorView(
-                      message: 'Could not load messages.',
-                      onRetry: () => ref.invalidate(messagesProvider(convo.id))),
+                    message: 'Could not load messages.',
+                    onRetry: () => ref.invalidate(messagesProvider(convo.id)),
+                  ),
                   data: (loaded) {
                     if (_messages.isEmpty && loaded.isNotEmpty) {
                       // API returns most-recent-first; render oldest-first.
                       _messages.addAll(loaded.reversed);
                       // Send read receipts for anything from the other side.
                       WidgetsBinding.instance.addPostFrameCallback(
-                          (_) => _markIncomingRead(convo.id));
+                        (_) => _markIncomingRead(convo.id),
+                      );
                     }
                     if (_messages.isEmpty) {
                       return const EmptyView(
-                          icon: LucideIcons.messageCircle, message: 'Say hi 👋');
+                        icon: LucideIcons.messageCircle,
+                        message: 'Say hi 👋',
+                      );
                     }
                     return ListView.builder(
                       controller: _scroll,
@@ -693,9 +917,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       itemCount: _messages.length,
                       itemBuilder: (_, i) {
                         final m = _messages[i];
-                        final showDateSeparator = i == 0 ||
+                        final showDateSeparator =
+                            i == 0 ||
                             !RelativeTime.isSameDay(
-                                _messages[i - 1].createdAt, m.createdAt);
+                              _messages[i - 1].createdAt,
+                              m.createdAt,
+                            );
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -721,20 +948,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _dateSeparator(DateTime t) => Center(
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(RelativeTime.dayLabel(t),
-              style: const TextStyle(fontSize: 11, color: AppColors.mutedFg)),
-        ),
-      );
+    child: Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        RelativeTime.dayLabel(t),
+        style: const TextStyle(fontSize: 11, color: AppColors.mutedFg),
+      ),
+    ),
+  );
 
   Widget _bubble(
-      ChatMessage m, List<MessageReaction> reactions, String conversationId) {
+    ChatMessage m,
+    List<MessageReaction> reactions,
+    String conversationId,
+  ) {
     final theme = Theme.of(context);
     final myId = ref.watch(currentUserProvider).valueOrNull?.userId;
     final mine = myId != null && m.isMine(myId);
@@ -742,9 +974,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
-        crossAxisAlignment:
-            mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: mine
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
+          // `senderId == null` means the sender's account has since been
+          // deleted (`delete-account` anonymizes rather than removes their
+          // messages — see `Safety.Trust Backend.md` §3). There's no profile
+          // to resolve a name from, so label it explicitly instead of
+          // silently rendering as if it were the current partner.
+          if (m.senderId == null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2, left: 4),
+              child: Text(
+                'Deleted user',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.mutedFg.withValues(alpha: 0.8),
+                ),
+              ),
+            ),
           Row(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -757,9 +1007,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       : null,
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.68),
+                      maxWidth: MediaQuery.of(context).size.width * 0.68,
+                    ),
                     decoration: BoxDecoration(
                       color: mine
                           ? AppColors.pink
@@ -780,31 +1034,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (m.isEdited) ...[
-                              Text('edited',
-                                  style: TextStyle(
-                                      fontSize: 10,
-                                      fontStyle: FontStyle.italic,
-                                      color: (mine
+                              Text(
+                                'edited',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontStyle: FontStyle.italic,
+                                  color:
+                                      (mine
                                               ? Colors.white
                                               : theme.colorScheme.onSurface)
-                                          .withValues(alpha: 0.6))),
+                                          .withValues(alpha: 0.6),
+                                ),
+                              ),
                               const SizedBox(width: 4),
                             ],
-                            Text(RelativeTime.clock(m.createdAt),
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: (mine ? Colors.white : theme.colorScheme.onSurface)
-                                        .withValues(alpha: 0.7))),
+                            Text(
+                              RelativeTime.clock(m.createdAt),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color:
+                                    (mine
+                                            ? Colors.white
+                                            : theme.colorScheme.onSurface)
+                                        .withValues(alpha: 0.7),
+                              ),
+                            ),
                             if (mine) ...[
                               const SizedBox(width: 4),
                               Icon(
-                                  m.status == MessageStatus.read
-                                      ? LucideIcons.checkCheck
-                                      : LucideIcons.check,
-                                  size: 13,
-                                  color: m.status == MessageStatus.read
-                                      ? Colors.lightBlueAccent
-                                      : Colors.white70),
+                                m.status == MessageStatus.read
+                                    ? LucideIcons.checkCheck
+                                    : LucideIcons.check,
+                                size: 13,
+                                color: m.status == MessageStatus.read
+                                    ? Colors.lightBlueAccent
+                                    : Colors.white70,
+                              ),
                             ],
                           ],
                         ),
@@ -825,15 +1090,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _reactionButton(ChatMessage m) => IconButton(
-        icon: const Icon(LucideIcons.plus, size: 15),
-        tooltip: 'React',
-        visualDensity: VisualDensity.compact,
-        onPressed: () => _toggleReactionPicker(m.id),
-      );
+    icon: const Icon(LucideIcons.plus, size: 15),
+    tooltip: 'React',
+    visualDensity: VisualDensity.compact,
+    onPressed: () => _toggleReactionPicker(m.id),
+  );
 
   /// The old app's inline 20-emoji picker (white card, 3 rows), replacing the
   /// old 6-emoji bottom sheet — anchored under the bubble it's reacting to.
-  Widget _inlineReactionPicker(ChatMessage m, String conversationId) => Container(
+  Widget _inlineReactionPicker(ChatMessage m, String conversationId) =>
+      Container(
         margin: const EdgeInsets.only(top: 4, bottom: 4),
         padding: const EdgeInsets.all(10),
         constraints: const BoxConstraints(maxWidth: 260),
@@ -841,7 +1107,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [
-            BoxShadow(color: Color(0x22000000), blurRadius: 12, offset: Offset(0, 4)),
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
           ],
         ),
         child: Wrap(
@@ -863,7 +1133,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// Reaction chips under a bubble. Emojis are grouped with a count; tapping
   /// a chip you contributed to removes your own reaction.
   Widget _reactionChips(
-      List<MessageReaction> reactions, String? myId, String conversationId) {
+    List<MessageReaction> reactions,
+    String? myId,
+    String conversationId,
+  ) {
     final byEmoji = <String, List<MessageReaction>>{};
     for (final r in reactions) {
       byEmoji.putIfAbsent(r.emoji, () => []).add(r);
@@ -880,14 +1153,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _reactionChip(String emoji, List<MessageReaction> rs, String? myId,
-      String conversationId) {
+  Widget _reactionChip(
+    String emoji,
+    List<MessageReaction> rs,
+    String? myId,
+    String conversationId,
+  ) {
     final theme = Theme.of(context);
     final mine = myId == null
         ? null
         : rs.where((r) => r.userId == myId).firstOrNull;
     return GestureDetector(
-      onTap: mine == null ? null : () => _removeReaction(mine.id, conversationId),
+      onTap: mine == null
+          ? null
+          : () => _removeReaction(mine.id, conversationId),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
@@ -925,8 +1204,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         // object itself if no thumbnail path was stored.
         return _MediaThumb(
           urlFuture: m.thumbnailUrl != null
-              ? repo.signedUrlFor(m.thumbnailUrl, MessageType.video,
-                  thumbnail: true)
+              ? repo.signedUrlFor(
+                  m.thumbnailUrl,
+                  MessageType.video,
+                  thumbnail: true,
+                )
               : repo.signedUrlFor(m.mediaUrl, MessageType.video),
           isVideo: true,
         );
@@ -945,103 +1227,117 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _composer(ThemeData theme, String conversationId) => SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            border: Border(top: BorderSide(color: theme.colorScheme.outline)),
+    top: false,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: theme.colorScheme.outline)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _circleComposerButton(
+            icon: LucideIcons.image,
+            tooltip: 'Send photo',
+            onTap: _sendingMedia ? null : () => _sendPhoto(conversationId),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _circleComposerButton(
-                icon: LucideIcons.image,
-                tooltip: 'Send photo',
-                onTap: _sendingMedia ? null : () => _sendPhoto(conversationId),
-              ),
-              const SizedBox(width: 6),
-              _circleComposerButton(
-                icon: LucideIcons.paperclip,
-                tooltip: 'Attach video',
-                onTap: _sendingMedia ? null : () => _attachVideo(conversationId),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _recording
-                    ? Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(999),
+          const SizedBox(width: 6),
+          _circleComposerButton(
+            icon: LucideIcons.paperclip,
+            tooltip: 'Attach video',
+            onTap: _sendingMedia ? null : () => _attachVideo(conversationId),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _recording
+                ? Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.mic,
+                          color: AppColors.destructive,
+                          size: 18,
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(LucideIcons.mic, color: AppColors.destructive, size: 18),
-                            const SizedBox(width: 8),
-                            Text('Recording… tap to send',
-                                style: theme.textTheme.bodyMedium),
-                          ],
+                        const SizedBox(width: 8),
+                        Text(
+                          'Recording… tap to send',
+                          style: theme.textTheme.bodyMedium,
                         ),
-                      )
-                    : TextField(
-                        controller: _input,
-                        minLines: 1,
-                        maxLines: 4,
-                        maxLength: 2000,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Message',
-                          isDense: true,
-                          counterText: '',
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(999),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          suffixIcon: IconButton(
-                            icon: const Icon(LucideIcons.smile, size: 18),
-                            tooltip: 'Emoji',
-                            onPressed: _openEmojiPicker,
-                          ),
-                        ),
+                      ],
+                    ),
+                  )
+                : TextField(
+                    controller: _input,
+                    minLines: 1,
+                    maxLines: 4,
+                    maxLength: 2000,
+                    onChanged: (_) {
+                      setState(() {});
+                      _onComposerChanged(conversationId);
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Message',
+                      isDense: true,
+                      counterText: '',
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceContainerHighest,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide.none,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      suffixIcon: IconButton(
+                        icon: const Icon(LucideIcons.smile, size: 18),
+                        tooltip: 'Emoji',
+                        onPressed: _openEmojiPicker,
+                      ),
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 6),
+          if (_sendingMedia)
+            const Padding(
+              padding: EdgeInsets.all(10),
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              const SizedBox(width: 6),
-              if (_sendingMedia)
-                const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-                )
-              else
-                _micOrSendFab(conversationId),
-            ],
-          ),
-        ),
-      );
+            )
+          else
+            _micOrSendFab(conversationId),
+        ],
+      ),
+    ),
+  );
 
-  Widget _circleComposerButton(
-          {required IconData icon, required String tooltip, VoidCallback? onTap}) =>
-      Material(
-        color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.35),
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: 42,
-            height: 42,
-            child: Icon(icon, size: 19, color: AppColors.pink),
-          ),
-        ),
-      );
+  Widget _circleComposerButton({
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onTap,
+  }) => Material(
+    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.35),
+    shape: const CircleBorder(),
+    child: InkWell(
+      customBorder: const CircleBorder(),
+      onTap: onTap,
+      child: SizedBox(
+        width: 42,
+        height: 42,
+        child: Icon(icon, size: 19, color: AppColors.pink),
+      ),
+    ),
+  );
 
   Widget _micOrSendFab(String conversationId) {
     final hasText = _input.text.trim().isNotEmpty;
@@ -1050,7 +1346,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         : (hasText ? LucideIcons.send : LucideIcons.mic);
     final onTap = _recording
         ? () => _toggleVoice(conversationId)
-        : (hasText ? () => _send(conversationId) : () => _toggleVoice(conversationId));
+        : (hasText
+              ? () => _send(conversationId)
+              : () => _toggleVoice(conversationId));
     return Container(
       width: 44,
       height: 44,
@@ -1106,14 +1404,20 @@ class _MediaThumbState extends State<_MediaThumb> {
             builder: (_, snap) {
               if (snap.connectionState != ConnectionState.done) {
                 return SizedBox(
-                    width: size,
-                    height: size,
-                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
+                  width: size,
+                  height: size,
+                  child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
               }
               final url = snap.data;
               if (url == null || url.isEmpty) {
                 return SizedBox(
-                    width: size, height: size, child: const Icon(LucideIcons.imageOff, size: 40));
+                  width: size,
+                  height: size,
+                  child: const Icon(LucideIcons.imageOff, size: 40),
+                );
               }
               return CachedNetworkImage(
                 imageUrl: url,
@@ -1121,11 +1425,17 @@ class _MediaThumbState extends State<_MediaThumb> {
                 height: size,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => SizedBox(
-                    width: size,
-                    height: size,
-                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
+                  width: size,
+                  height: size,
+                  child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
                 errorWidget: (_, _, _) => SizedBox(
-                    width: size, height: size, child: const Icon(LucideIcons.imageOff, size: 40)),
+                  width: size,
+                  height: size,
+                  child: const Icon(LucideIcons.imageOff, size: 40),
+                ),
               );
             },
           ),
@@ -1140,4 +1450,3 @@ class _MediaThumbState extends State<_MediaThumb> {
     );
   }
 }
-

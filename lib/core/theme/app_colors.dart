@@ -39,6 +39,11 @@ class AppColors {
   static const Color bgLight = Color(0xFFFDEEF4);
   static const Color cardLight = Color(0xFFFFFFFF);
   static const Color fgLight = Color(0xFF1F1F1F);
+
+  /// A softer near-black for body text / labels that shouldn't read as
+  /// pure black (e.g. onboarding field labels) — [fgLight] stays reserved
+  /// for headings and other places that want full contrast.
+  static const Color fgSoft = Color(0xFF3A3A3A);
   static const Color mutedLight = Color(0xFFF8E8ED);
   static const Color mutedFg = Color(0xFF737373);
   static const Color borderLight = Color(0xFFF2DCE5);

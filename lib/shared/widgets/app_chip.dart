@@ -34,12 +34,20 @@ class AppChip extends StatelessWidget {
   final bool dense;
 
   (Color bg, Color fg, Color? border) get _colors => switch (tone) {
-        AppChipTone.yellow => (AppColors.chipYellowBg, AppColors.chipYellowFg, null),
-        AppChipTone.pink => (AppColors.chipPinkBg, AppColors.chipPinkFg, null),
-        AppChipTone.grey => (AppColors.chipGreyBg, AppColors.chipGreyFg, null),
-        AppChipTone.dark => (const Color(0xCC1F1F1F), AppColors.white, null),
-        AppChipTone.outlinePink => (Colors.transparent, AppColors.pink, AppColors.pink),
-      };
+    AppChipTone.yellow => (
+      AppColors.chipYellowBg,
+      AppColors.chipYellowFg,
+      null,
+    ),
+    AppChipTone.pink => (AppColors.chipPinkBg, AppColors.chipPinkFg, null),
+    AppChipTone.grey => (AppColors.chipGreyBg, AppColors.chipGreyFg, null),
+    AppChipTone.dark => (const Color(0xCC1F1F1F), AppColors.white, null),
+    AppChipTone.outlinePink => (
+      Colors.transparent,
+      AppColors.pink,
+      AppColors.pink,
+    ),
+  };
 
   @override
   Widget build(BuildContext context) {

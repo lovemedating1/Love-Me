@@ -40,18 +40,20 @@ class AppShell extends ConsumerWidget {
     return Scaffold(
       body: Center(
         child: ConstrainedBox(
-          constraints:
-              const BoxConstraints(maxWidth: AppConstants.maxContainerWidth),
+          constraints: const BoxConstraints(
+            maxWidth: AppConstants.maxContainerWidth,
+          ),
           child: Column(
             children: [
               AppHeader(
                 actions: headerActions,
-                onNotificationsTap: () =>
-                    onNavigate(RoutePaths.notifications),
+                onNotificationsTap: () => onNavigate(RoutePaths.notifications),
                 onAccountPillTap: () => InfoModals.accountExpiry(context),
                 onSubscriptionPillTap: () {
-                  final until =
-                      ref.read(currentUserProvider).valueOrNull?.premiumUntil;
+                  final until = ref
+                      .read(currentUserProvider)
+                      .valueOrNull
+                      ?.premiumUntil;
                   if (until != null) {
                     InfoModals.subscriptionExpiry(context, expiresAt: until);
                   }

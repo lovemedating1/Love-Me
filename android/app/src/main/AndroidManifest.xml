@@ -9,6 +9,20 @@
          background tracking, so only the foreground permissions are needed. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Runtime-requested (FcmService.init) on Android 13+ for push notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Agora voice/video calls: network transport, audio routing (incl.
+         Bluetooth headsets), and keeping the CPU awake during an active call.
+         CAMERA + RECORD_AUDIO (declared above) are also used by calls. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- Required by in_app_purchase/Google Play Billing (FINAL TIER, real
+         subscriptions) — without this, BillingClient connections fail. -->
+    <uses-permission android:name="com.android.vending.BILLING"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
 
@@ -37,6 +51,19 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Deep link for Supabase auth emails (sign-up confirmation,
+                 password reset — see BACKEND_CONFIRM_EMAIL_HANDOFF.md). The
+                 Supabase Flutter SDK listens for this scheme itself and
+                 completes the session exchange automatically; no app_links
+                 code needed on our side. Must be registered as the "Redirect
+                 URL" in the Supabase Auth dashboard for this to actually be
+                 what the emailed link points at. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="lovemeinternational" android:host="login-callback"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -49,6 +76,23 @@
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="face" />
+
+        <!-- Default small icon for FCM notifications (falls back to the
+             launcher icon if this drawable doesn't exist). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
+        <!-- Explicit HIGH-importance channel for FCM `notification`-block
+             messages, created at runtime by FcmService._createNotificationChannel.
+             Without this, Android falls back to an auto-created default
+             channel whose importance isn't guaranteed — a plausible reason
+             a notification could fail to surface with the app backgrounded/
+             killed even though the FCM payload itself is correct. See
+             BACKEND_PUSH_BACKGROUND_BUG_INVESTIGATION.md. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="loveme_default_channel" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

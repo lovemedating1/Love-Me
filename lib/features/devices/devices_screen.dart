@@ -28,7 +28,38 @@ class DevicesScreen extends ConsumerStatefulWidget {
 }
 
 class _DevicesScreenState extends ConsumerState<DevicesScreen> {
-  final Set<String> _revoked = {};
+  bool _revoking = false;
+
+  void _toast(String msg, {bool error = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: error ? AppColors.destructive : AppColors.pink,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  /// Deletes every `active_sessions` row except this device's own. **No
+  /// server-side single-device enforcement exists yet** (BACKEND_REMAINING.md
+  /// [BE-1]) — this only clears the client's own bookkeeping rows; it cannot
+  /// actually force another signed-in device to sign out.
+  Future<void> _revokeOthers() async {
+    final myToken = ref.read(currentSessionTokenProvider);
+    if (myToken == null) return;
+    setState(() => _revoking = true);
+    try {
+      await ref.read(deviceSessionRepositoryProvider).revokeAllOthers(myToken);
+      ref.invalidate(devicesProvider);
+    } catch (_) {
+      if (mounted)
+        _toast('Could not revoke other sessions — try again.', error: true);
+    } finally {
+      if (mounted) setState(() => _revoking = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +69,21 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       body: devices.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => ErrorView(
-            message: 'Could not load devices.',
-            onRetry: () => ref.invalidate(devicesProvider)),
+          message: 'Could not load devices.',
+          onRetry: () => ref.invalidate(devicesProvider),
+        ),
         data: (list) {
-          final active = list.where((d) => !_revoked.contains(d.id)).toList();
+          if (list.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No recorded sessions yet.',
+                  style: TextStyle(color: AppColors.mutedFg),
+                ),
+              ),
+            );
+          }
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -51,15 +93,16 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                 style: TextStyle(color: AppColors.mutedFg, fontSize: 13),
               ),
               const SizedBox(height: 16),
-              for (final d in active) _tile(context, d),
+              for (final d in list) _tile(context, d),
               const SizedBox(height: 20),
               GradientButton(
                 label: 'Sign out of other devices',
                 icon: LucideIcons.logOut,
+                loading: _revoking,
                 gradient: const LinearGradient(
-                    colors: [AppColors.destructive, AppColors.destructive]),
-                onPressed: () => setState(() => _revoked
-                    .addAll(list.where((d) => !d.isCurrent).map((d) => d.id))),
+                  colors: [AppColors.destructive, AppColors.destructive],
+                ),
+                onPressed: _revoking ? null : _revokeOthers,
               ),
             ],
           );
@@ -81,7 +124,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       child: Row(
         children: [
           Icon(
-            d.label.contains('Chrome') ? LucideIcons.monitor : LucideIcons.smartphone,
+            d.label.contains('Chrome')
+                ? LucideIcons.monitor
+                : LucideIcons.smartphone,
             color: d.isCurrent ? AppColors.pink : AppColors.mutedFg,
           ),
           const SizedBox(width: 12),
@@ -92,19 +137,30 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                 Row(
                   children: [
                     Flexible(
-                      child: Text(d.label,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      child: Text(
+                        d.label,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                     if (d.isCurrent) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                            color: AppColors.online.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(999)),
-                        child: const Text('This device',
-                            style: TextStyle(fontSize: 10, color: AppColors.online)),
+                          color: AppColors.online.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'This device',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.online,
+                          ),
+                        ),
                       ),
                     ],
                   ],
@@ -113,7 +169,10 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                 Text(
                   'Last active ${daysAgo <= 0 ? "today" : "${daysAgo}d ago"} · '
                   'Signed in ${daysAgo}d ago',
-                  style: const TextStyle(color: AppColors.mutedFg, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppColors.mutedFg,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),

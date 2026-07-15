@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show FunctionException;
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -15,6 +16,13 @@ import '../auth/auth_controller.dart';
 /// password field, type-"DELETE" confirmation, and reason dropdown are all
 /// REMOVED (the old app has none of them) — a plain confirm dialog stands
 /// in as the only "are you sure" gate.
+///
+/// Calls [AuthController.deleteAccount], which invokes the proposed
+/// `delete-account` Edge Function (see `BACKEND_ATIER_HANDOFF.md` §3). That
+/// function doesn't exist server-side yet ([BE-7]) — a 404 is caught and
+/// shown as "not available yet" rather than a raw error, so the screen is
+/// honest about today's state while still being fully wired for when
+/// backend ships it.
 class DeleteAccountScreen extends ConsumerStatefulWidget {
   const DeleteAccountScreen({super.key});
 
@@ -40,13 +48,17 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete your account?'),
         content: const Text(
-            'This is permanent and cannot be undone. Are you sure you want to continue?'),
+          'This is permanent and cannot be undone. Are you sure you want to continue?',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.destructive),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.destructive,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -56,23 +68,48 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     if (confirmed != true) return;
 
     setState(() => _deleting = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    ref.read(authControllerProvider.notifier).signOut();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Your account has been deleted.'),
-      behavior: SnackBarBehavior.floating,
-    ));
-    // Guard will route to /auth after sign-out.
+    try {
+      await ref.read(authControllerProvider.notifier).deleteAccount();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your account has been deleted.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      // Guard will route to /auth after sign-out.
+    } on FunctionException catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      final notFound = e.status == 404;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            notFound
+                ? 'Account deletion isn\'t available yet — please contact support.'
+                : 'Could not delete your account — try again.',
+          ),
+          backgroundColor: AppColors.destructive,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not delete your account — try again.'),
+          backgroundColor: AppColors.destructive,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: SubPageHeader(
-        title: 'Delete Account',
-        actions: const [],
-      ),
+      appBar: SubPageHeader(title: 'Delete Account', actions: const []),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -81,7 +118,9 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.destructive.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: AppColors.destructive.withValues(alpha: 0.3),
+              ),
               boxShadow: AppTheme.cardShadow,
             ),
             child: Column(
@@ -89,13 +128,19 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
               children: [
                 const Row(
                   children: [
-                    Icon(LucideIcons.triangleAlert, color: AppColors.destructive),
+                    Icon(
+                      LucideIcons.triangleAlert,
+                      color: AppColors.destructive,
+                    ),
                     SizedBox(width: 10),
-                    Text('Danger Zone',
-                        style: TextStyle(
-                            color: AppColors.destructive,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 17)),
+                    Text(
+                      'Danger Zone',
+                      style: TextStyle(
+                        color: AppColors.destructive,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -105,7 +150,10 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('•  ', style: TextStyle(color: AppColors.destructive)),
+                        const Text(
+                          '•  ',
+                          style: TextStyle(color: AppColors.destructive),
+                        ),
                         Expanded(child: Text(c)),
                       ],
                     ),
@@ -115,16 +163,20 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.destructive,
-                        minimumSize: const Size.fromHeight(52),
-                        shape: const StadiumBorder()),
+                      backgroundColor: AppColors.destructive,
+                      minimumSize: const Size.fromHeight(52),
+                      shape: const StadiumBorder(),
+                    ),
                     onPressed: _deleting ? null : _confirmAndDelete,
                     child: _deleting
                         ? const SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : const Text('Delete My Account'),
                   ),
                 ),

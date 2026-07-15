@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../core/constants/route_paths.dart';
+import '../../core/notifications/notification_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_format.dart';
 import '../../shared/data/repositories.dart';
@@ -38,15 +38,20 @@ class NotificationsScreen extends ConsumerWidget {
         child: notifs.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (_, _) => ErrorView(
-              message: 'Could not load notifications.',
-              onRetry: () => ref.invalidate(notificationsProvider)),
+            message: 'Could not load notifications.',
+            onRetry: () => ref.invalidate(notificationsProvider),
+          ),
           data: (list) {
             if (list.isEmpty) {
-              return ListView(children: const [
-                SizedBox(height: 160),
-                EmptyView(
-                    icon: LucideIcons.bell, message: 'No notifications yet.'),
-              ]);
+              return ListView(
+                children: const [
+                  SizedBox(height: 160),
+                  EmptyView(
+                    icon: LucideIcons.bell,
+                    message: 'No notifications yet.',
+                  ),
+                ],
+              );
             }
             return ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -72,55 +77,58 @@ class NotificationsScreen extends ConsumerWidget {
         if (context.mounted) _deepLink(context, n);
       },
       leading: CircleAvatar(
-        backgroundColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.35),
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.secondary.withValues(alpha: 0.35),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(n.title,
-          style: theme.textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w600)),
+      title: Text(
+        n.title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       subtitle: Text(n.body, maxLines: 2, overflow: TextOverflow.ellipsis),
-      trailing: Text(RelativeTime.absolute(n.createdAt),
-          style: theme.textTheme.labelSmall),
+      trailing: Text(
+        RelativeTime.absolute(n.createdAt),
+        style: theme.textTheme.labelSmall,
+      ),
     );
   }
 
   (IconData, Color) _iconFor(NotificationType t) => switch (t) {
-        NotificationType.newLike => (LucideIcons.heart, AppColors.pink),
-        NotificationType.newMatch => (LucideIcons.sparkles, AppColors.pink),
-        NotificationType.newMessage => (LucideIcons.messageCircle, AppColors.purple),
-        NotificationType.callIncoming => (LucideIcons.phoneIncoming, AppColors.purple),
-        NotificationType.callMissed => (LucideIcons.phoneMissed, AppColors.destructive),
-        NotificationType.profileView => (LucideIcons.eye, AppColors.gold),
-        NotificationType.profileVerified => (LucideIcons.badgeCheck, AppColors.success),
-        NotificationType.subscriptionExpiring => (LucideIcons.clock, AppColors.gold),
-        NotificationType.subscriptionActive => (LucideIcons.crown, AppColors.gold),
-        NotificationType.reportUpdate => (LucideIcons.shield, AppColors.destructive),
-        NotificationType.system => (LucideIcons.info, AppColors.mutedFg),
-      };
+    NotificationType.newLike => (LucideIcons.heart, AppColors.pink),
+    NotificationType.newMatch => (LucideIcons.sparkles, AppColors.pink),
+    NotificationType.newMessage => (
+      LucideIcons.messageCircle,
+      AppColors.purple,
+    ),
+    NotificationType.callIncoming => (
+      LucideIcons.phoneIncoming,
+      AppColors.purple,
+    ),
+    NotificationType.callMissed => (
+      LucideIcons.phoneMissed,
+      AppColors.destructive,
+    ),
+    NotificationType.profileView => (LucideIcons.eye, AppColors.gold),
+    NotificationType.profileVerified => (
+      LucideIcons.badgeCheck,
+      AppColors.success,
+    ),
+    NotificationType.subscriptionExpiring => (
+      LucideIcons.clock,
+      AppColors.gold,
+    ),
+    NotificationType.subscriptionActive => (LucideIcons.crown, AppColors.gold),
+    NotificationType.reportUpdate => (
+      LucideIcons.shield,
+      AppColors.destructive,
+    ),
+    NotificationType.system => (LucideIcons.info, AppColors.mutedFg),
+  };
 
-  /// Uses [AppNotification.data] for deep-link targets per migration_004.md.
-  /// `newMessage`/`newMatch` carry a `conversation_id`, not a partner user id
-  /// — the chat route is keyed by partner id, so those go to the Messages
-  /// list rather than guessing at a conversion.
   void _deepLink(BuildContext context, AppNotification n) {
-    switch (n.type) {
-      case NotificationType.newLike:
-        context.push(RoutePaths.likes);
-      case NotificationType.newMatch:
-      case NotificationType.newMessage:
-      case NotificationType.callIncoming:
-      case NotificationType.callMissed:
-        context.push(RoutePaths.messages);
-      case NotificationType.profileView:
-      case NotificationType.profileVerified:
-        context.push(RoutePaths.profile);
-      case NotificationType.subscriptionExpiring:
-      case NotificationType.subscriptionActive:
-        context.push(RoutePaths.subscription);
-      case NotificationType.reportUpdate:
-        context.push(RoutePaths.safetyReports);
-      case NotificationType.system:
-        break;
-    }
+    navigateForNotificationType(GoRouter.of(context), n.type);
   }
 }

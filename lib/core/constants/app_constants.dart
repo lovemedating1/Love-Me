@@ -29,5 +29,10 @@ class AppConstants {
   /// so it's unambiguous. Avoids adding a separate boolean column.
   static const int kWorldwideDistanceKm = 20000;
 
-  static const String supportEmail = 'support@loveme-app.com';
+  /// Only real, actively-monitored inbox (confirmed by backend 2026-07-13 —
+  /// see BACKEND_EMAIL_MASTER_HANDOFF.md reply). Covers both general support
+  /// and child-safety triage — `support@loveme-app.com` and
+  /// `lovemedatingappchildsafety@gmail.com` were never real/monitored
+  /// addresses and must not be shown to users.
+  static const String supportEmail = 'lovemedating1@gmail.com';
 }

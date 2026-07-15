@@ -1,120 +1,94 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/constants/route_paths.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/gradient_button.dart';
+import 'auth_controller.dart';
 
-/// 02 — EmailVerifiedPage. UI-parity rebuild matching the old app's real
-/// 6-digit OTP code entry screen (`old app ss/onboring_screens/WhatsApp
-/// Image … 11.04.02/03 PM.jpeg`) instead of our old static "Email
-/// verified!" landing screen.
+/// 02 — EmailVerifiedPage.
 ///
-/// ⚠️ **UI ONLY — not wired to a real verification backend.** Supabase
-/// "Confirm email" is currently disabled server-side (see CLAUDE.md), and
-/// there is no OTP-verification RPC/edge function to call. Per explicit
-/// instruction: the Continue step must NOT let the user through just
-/// because *a* widget exists — it stays disabled until 6 digits are
-/// entered, and submitting shows an honest "not available yet" message
-/// rather than pretending to verify anything. Wire this up once the real
-/// OTP flow is enabled server-side and its contract is known.
-class EmailVerifiedScreen extends StatefulWidget {
+/// Link-based confirmation (2026-07-13): Supabase's own confirmation email
+/// contains a link the user taps — there is no code to enter. This screen
+/// just tells the user to check their inbox and offers a resend, then waits
+/// (the router redirects away automatically once `auth.onAuthStateChange`
+/// reports the session is confirmed — see `router_guards.dart`).
+///
+/// Supersedes the old 6-digit OTP mock UI, which never had a real backend to
+/// verify against (there is no separate OTP flow — Supabase's link IS the
+/// verification). See `BACKEND_CONFIRM_EMAIL_HANDOFF.md`.
+class EmailVerifiedScreen extends ConsumerStatefulWidget {
   const EmailVerifiedScreen({super.key, this.email});
 
   final String? email;
 
   @override
-  State<EmailVerifiedScreen> createState() => _EmailVerifiedScreenState();
+  ConsumerState<EmailVerifiedScreen> createState() =>
+      _EmailVerifiedScreenState();
 }
 
-class _EmailVerifiedScreenState extends State<EmailVerifiedScreen> {
-  static const _codeLength = 6;
-  static const _initialSeconds = 9 * 60 + 53; // matches the old app's 9:53
+class _EmailVerifiedScreenState extends ConsumerState<EmailVerifiedScreen> {
+  static const _resendCooldownSeconds = 60;
 
-  final List<TextEditingController> _digits =
-      List.generate(_codeLength, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes =
-      List.generate(_codeLength, (_) => FocusNode());
-
-  int _secondsLeft = _initialSeconds;
+  int _resendCooldown = 0;
   Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
-      if (_secondsLeft <= 0) {
-        t.cancel();
-        return;
-      }
-      setState(() => _secondsLeft--);
-    });
-  }
+  bool _resending = false;
 
   @override
   void dispose() {
     _timer?.cancel();
-    for (final c in _digits) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
     super.dispose();
   }
 
-  String get _code => _digits.map((c) => c.text).join();
-  bool get _codeComplete => _code.length == _codeLength;
-
-  String get _countdownLabel {
-    final m = _secondsLeft ~/ 60;
-    final s = _secondsLeft % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
+  void _startCooldown() {
+    setState(() => _resendCooldown = _resendCooldownSeconds);
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (_resendCooldown <= 1) {
+        t.cancel();
+        setState(() => _resendCooldown = 0);
+        return;
+      }
+      setState(() => _resendCooldown--);
+    });
   }
 
-  void _onDigitChanged(int index, String value) {
-    if (value.isNotEmpty && index < _codeLength - 1) {
-      _focusNodes[index + 1].requestFocus();
+  Future<void> _resend() async {
+    final email = widget.email;
+    if (email == null || _resending) return;
+    setState(() => _resending = true);
+    try {
+      await ref
+          .read(authControllerProvider.notifier)
+          .resendConfirmationEmail(email);
+      if (!mounted) return;
+      _startCooldown();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Confirmation email resent.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Could not resend — please try again shortly.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _resending = false);
     }
-    setState(() {});
-  }
-
-  Future<void> _pasteCode() async {
-    final data = await Clipboard.getData('text/plain');
-    final text = data?.text?.replaceAll(RegExp(r'\D'), '') ?? '';
-    if (text.isEmpty) return;
-    for (var i = 0; i < _codeLength; i++) {
-      _digits[i].text = i < text.length ? text[i] : '';
-    }
-    setState(() {});
-  }
-
-  void _resend() {
-    setState(() => _secondsLeft = _initialSeconds);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(
-        content: Text('Resending isn\'t available yet — backend not built.'),
-        behavior: SnackBarBehavior.floating,
-      ));
-  }
-
-  void _submit() {
-    if (!_codeComplete) return;
-    // Deliberately does NOT navigate anywhere — no real verification exists
-    // to check the code against. Per instruction: entering digits alone
-    // must not be enough to move forward.
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(
-        content: Text('Email verification isn\'t available yet — backend not built.'),
-        behavior: SnackBarBehavior.floating,
-      ));
   }
 
   @override
@@ -143,47 +117,45 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen> {
                         color: AppColors.pink,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(LucideIcons.mail,
-                          color: Colors.white, size: 32),
+                      child: const Icon(
+                        LucideIcons.mailCheck,
+                        color: Colors.white,
+                        size: 32,
+                      ),
                     ),
                     const SizedBox(height: 18),
-                    const Text('Verify Your Email',
-                        style: TextStyle(
-                            fontSize: 22, fontWeight: FontWeight.w800)),
+                    const Text(
+                      'Check Your Email',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     Text.rich(
                       TextSpan(
                         style: const TextStyle(
-                            color: AppColors.mutedFg, height: 1.4),
+                          color: AppColors.mutedFg,
+                          height: 1.4,
+                        ),
                         children: [
-                          const TextSpan(text: 'We sent a 6-digit code to\n'),
-                          TextSpan(
-                              text: widget.email ?? 'your email',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.fgLight)),
                           const TextSpan(
-                              text: '. Enter it below to verify your account.'),
+                            text: 'We sent a confirmation link to\n',
+                          ),
+                          TextSpan(
+                            text: widget.email ?? 'your email',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.fgLight,
+                            ),
+                          ),
+                          const TextSpan(
+                            text:
+                                '. Tap the link in that email to finish setting up your account — this screen will move on automatically.',
+                          ),
                         ],
                       ),
                       textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 22),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        for (var i = 0; i < _codeLength; i++) _digitBox(i),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('⏱️', style: TextStyle(fontSize: 14)),
-                        const SizedBox(width: 6),
-                        Text('Code expires in $_countdownLabel',
-                            style: const TextStyle(fontWeight: FontWeight.w700)),
-                      ],
                     ),
                     const SizedBox(height: 18),
                     Container(
@@ -195,56 +167,36 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen> {
                       ),
                       child: const Text.rich(
                         TextSpan(
-                          style: TextStyle(color: AppColors.mutedFg, fontSize: 13),
+                          style: TextStyle(
+                            color: AppColors.mutedFg,
+                            fontSize: 13,
+                          ),
                           children: [
                             TextSpan(text: '📌 Don\'t see it? Check your '),
                             TextSpan(
-                                text: 'Spam',
-                                style: TextStyle(fontWeight: FontWeight.w800)),
+                              text: 'Spam',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
                             TextSpan(text: ' or '),
                             TextSpan(
-                                text: 'Promotions',
-                                style: TextStyle(fontWeight: FontWeight.w800)),
-                            TextSpan(
-                                text:
-                                    ' folder for an email from noreply@loveme-app.com'),
+                              text: 'Promotions',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            TextSpan(text: ' folder.'),
                           ],
                         ),
                         textAlign: TextAlign.center,
                       ),
                     ),
                     const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GradientButton(
-                            label: 'Paste Code',
-                            icon: LucideIcons.clipboard,
-                            height: 48,
-                            onPressed: _pasteCode,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _secondsLeft == 0 ? _resend : null,
-                            icon: const Icon(LucideIcons.refreshCw, size: 16),
-                            label: const Text('Resend'),
-                            style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
-                                shape: const StadiumBorder(),
-                                side: const BorderSide(color: AppColors.borderLight)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
                     GradientButton(
-                      label: 'Verify',
-                      // Disabled until all 6 digits are entered — a filled
-                      // field is not the same as a verified code, and there
-                      // is no backend to check it against yet regardless.
-                      onPressed: _codeComplete ? _submit : null,
+                      label: _resendCooldown > 0
+                          ? 'Resend in ${_resendCooldown}s'
+                          : 'Resend Email',
+                      icon: LucideIcons.refreshCw,
+                      onPressed: _resendCooldown == 0 && !_resending
+                          ? _resend
+                          : null,
                     ),
                     TextButton(
                       onPressed: () => context.go(RoutePaths.auth),
@@ -259,31 +211,4 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen> {
       ),
     );
   }
-
-  Widget _digitBox(int i) => SizedBox(
-        width: 44,
-        height: 54,
-        child: TextField(
-          controller: _digits[i],
-          focusNode: _focusNodes[i],
-          textAlign: TextAlign.center,
-          keyboardType: TextInputType.number,
-          maxLength: 1,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: InputDecoration(
-            counterText: '',
-            contentPadding: EdgeInsets.zero,
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.borderLight),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.pink, width: 2),
-            ),
-          ),
-          onChanged: (v) => _onDigitChanged(i, v),
-        ),
-      );
 }

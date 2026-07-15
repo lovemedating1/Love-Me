@@ -50,8 +50,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     if (!mounted) return;
     final myId = ref.read(currentUserProvider).valueOrNull?.userId;
     final otherId = myId == null ? null : match.otherUserId(myId);
-    final other =
-        otherId == null ? null : await ref.read(profileByIdProvider(otherId).future);
+    final other = otherId == null
+        ? null
+        : await ref.read(profileByIdProvider(otherId).future);
     if (!mounted) return;
     showDialog(
       context: context,
@@ -72,11 +73,14 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
             children: [
               const Icon(LucideIcons.heart, color: Colors.white, size: 56),
               const SizedBox(height: 12),
-              const Text("It's a Match!",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900)),
+              const Text(
+                "It's a Match!",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               const SizedBox(height: 8),
               Text(
                 other == null
@@ -88,8 +92,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
               const SizedBox(height: 20),
               FilledButton(
                 style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.pink),
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.pink,
+                ),
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   if (otherId != null) context.push(RoutePaths.chatTo(otherId));
@@ -98,8 +103,10 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
               ),
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Keep Swiping',
-                    style: TextStyle(color: Colors.white)),
+                child: const Text(
+                  'Keep Swiping',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -115,8 +122,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     return likes.when(
       loading: () => _listSkeleton(),
       error: (_, _) => ErrorView(
-          message: 'Could not load likes.',
-          onRetry: () => ref.invalidate(likedYouProvider)),
+        message: 'Could not load likes.',
+        onRetry: () => ref.invalidate(likedYouProvider),
+      ),
       data: (people) => _content(context, people, isPremium),
     );
   }
@@ -125,14 +133,17 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Text('People Who Like You',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w800)),
+        Text(
+          'People Who Like You',
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 4),
-        Text('Viewing all ${people.length} likes',
-            style: const TextStyle(color: AppColors.mutedFg)),
+        Text(
+          'Viewing all ${people.length} likes',
+          style: const TextStyle(color: AppColors.mutedFg),
+        ),
         const SizedBox(height: 14),
         if (isPremium)
           Container(
@@ -147,9 +158,13 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
               children: [
                 Icon(LucideIcons.crown, color: Colors.white, size: 18),
                 SizedBox(width: 8),
-                Text('Gold Plan',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700)),
+                Text(
+                  'Gold Plan',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),
@@ -157,8 +172,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
           const Padding(
             padding: EdgeInsets.only(top: 60),
             child: EmptyView(
-                icon: LucideIcons.heart,
-                message: 'No likes yet — keep swiping!'),
+              icon: LucideIcons.heart,
+              message: 'No likes yet — keep swiping!',
+            ),
           )
         else
           for (final p in people) _likeRow(context, p),
@@ -167,53 +183,70 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
   }
 
   Widget _likeRow(BuildContext context, Profile p) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Material(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => ProfilePreviewModal.show(context, p),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  AppAvatar(photoUrl: p.photoUrl, size: 52, isVerified: p.isVerified),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(p.name,
-                            style: const TextStyle(fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 2),
-                        Text('${p.city}, ${p.country}',
-                            style: const TextStyle(
-                                color: AppColors.mutedFg, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  Text(p.ageLabel,
-                      style: const TextStyle(
-                          color: AppColors.mutedFg, fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 6),
-                  const Icon(LucideIcons.chevronRight,
-                      size: 18, color: AppColors.mutedFg),
-                ],
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Material(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => ProfilePreviewModal.show(context, p),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              AppAvatar(
+                photoUrl: p.photoUrl,
+                size: 52,
+                isVerified: p.isVerified,
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.name,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${p.city}, ${p.country}',
+                      style: const TextStyle(
+                        color: AppColors.mutedFg,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                p.ageLabel,
+                style: const TextStyle(
+                  color: AppColors.mutedFg,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                LucideIcons.chevronRight,
+                size: 18,
+                color: AppColors.mutedFg,
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _listSkeleton() => ListView(
-        padding: const EdgeInsets.all(16),
-        children: List.generate(
-          6,
-          (_) => const Padding(
-            padding: EdgeInsets.only(bottom: 10),
-            child: SkeletonBox(height: 74, radius: 16),
-          ),
-        ),
-      );
+    padding: const EdgeInsets.all(16),
+    children: List.generate(
+      6,
+      (_) => const Padding(
+        padding: EdgeInsets.only(bottom: 10),
+        child: SkeletonBox(height: 74, radius: 16),
+      ),
+    ),
+  );
 }

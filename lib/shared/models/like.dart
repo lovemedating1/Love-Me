@@ -15,11 +15,11 @@ class Like extends Equatable {
   final DateTime createdAt;
 
   factory Like.fromJson(Map<String, dynamic> json) => Like(
-        id: json['id'] as String,
-        fromUserId: json['from_user_id'] as String,
-        toUserId: json['to_user_id'] as String,
-        createdAt: DateTime.parse(json['created_at'] as String),
-      );
+    id: json['id'] as String,
+    fromUserId: json['from_user_id'] as String,
+    toUserId: json['to_user_id'] as String,
+    createdAt: DateTime.parse(json['created_at'] as String),
+  );
 
   @override
   List<Object?> get props => [id, fromUserId, toUserId, createdAt];

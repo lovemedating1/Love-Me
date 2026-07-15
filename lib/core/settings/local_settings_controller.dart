@@ -13,8 +13,10 @@ enum CallRingtone {
   final String label;
   final String description;
 
-  static CallRingtone fromName(String? name) => CallRingtone.values
-      .firstWhere((r) => r.name == name, orElse: () => CallRingtone.classic);
+  static CallRingtone fromName(String? name) => CallRingtone.values.firstWhere(
+    (r) => r.name == name,
+    orElse: () => CallRingtone.classic,
+  );
 }
 
 /// Device-local settings — the ones with **no backing database column**,
@@ -51,15 +53,14 @@ class LocalSettings {
     bool? rememberEmail,
     String? rememberedEmail,
     bool clearRememberedEmail = false,
-  }) =>
-      LocalSettings(
-        vibrateOnCall: vibrateOnCall ?? this.vibrateOnCall,
-        ringtone: ringtone ?? this.ringtone,
-        rememberEmail: rememberEmail ?? this.rememberEmail,
-        rememberedEmail: clearRememberedEmail
-            ? null
-            : (rememberedEmail ?? this.rememberedEmail),
-      );
+  }) => LocalSettings(
+    vibrateOnCall: vibrateOnCall ?? this.vibrateOnCall,
+    ringtone: ringtone ?? this.ringtone,
+    rememberEmail: rememberEmail ?? this.rememberEmail,
+    rememberedEmail: clearRememberedEmail
+        ? null
+        : (rememberedEmail ?? this.rememberedEmail),
+  );
 }
 
 class LocalSettingsController extends Notifier<LocalSettings> {
@@ -119,4 +120,5 @@ class LocalSettingsController extends Notifier<LocalSettings> {
 
 final localSettingsProvider =
     NotifierProvider<LocalSettingsController, LocalSettings>(
-        LocalSettingsController.new);
+      LocalSettingsController.new,
+    );

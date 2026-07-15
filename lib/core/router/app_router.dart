@@ -18,11 +18,13 @@ import '../../features/misc/not_found_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/onboarding/profile_setup_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/safety/blocked_users_screen.dart';
 import '../../features/safety/safety_reports_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/subscription/subscription_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../constants/route_paths.dart';
+import 'navigator_key.dart';
 import 'router_guards.dart';
 
 /// go_router configuration.
@@ -38,6 +40,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: RoutePaths.discover,
     debugLogDiagnostics: true,
     refreshListenable: refresh,
@@ -46,14 +49,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       // ---- Public / auth flow ------------------------------------------
       GoRoute(path: RoutePaths.auth, builder: (_, _) => const AuthScreen()),
       GoRoute(
-          path: RoutePaths.emailVerified,
-          builder: (_, _) => const EmailVerifiedScreen()),
+        path: RoutePaths.emailVerified,
+        builder: (_, state) =>
+            EmailVerifiedScreen(email: state.uri.queryParameters['email']),
+      ),
       GoRoute(
-          path: RoutePaths.resetPassword,
-          builder: (_, _) => const ResetPasswordScreen()),
+        path: RoutePaths.resetPassword,
+        builder: (_, _) => const ResetPasswordScreen(),
+      ),
       GoRoute(
-          path: RoutePaths.profileSetup,
-          builder: (_, _) => const ProfileSetupScreen()),
+        path: RoutePaths.profileSetup,
+        builder: (_, _) => const ProfileSetupScreen(),
+      ),
 
       // ---- Tabs (AppShell) ---------------------------------------------
       ShellRoute(
@@ -68,15 +75,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
         routes: [
-          GoRoute(path: RoutePaths.discover, builder: (_, _) => const DiscoverScreen()),
-          GoRoute(path: RoutePaths.likes, builder: (_, _) => const LikesScreen()),
           GoRoute(
-              path: RoutePaths.messages,
-              builder: (_, _) => const MessagesScreen()),
+            path: RoutePaths.discover,
+            builder: (_, _) => const DiscoverScreen(),
+          ),
           GoRoute(
-              path: RoutePaths.explore, builder: (_, _) => const ExploreScreen()),
+            path: RoutePaths.likes,
+            builder: (_, _) => const LikesScreen(),
+          ),
           GoRoute(
-              path: RoutePaths.profile, builder: (_, _) => const ProfileScreen()),
+            path: RoutePaths.messages,
+            builder: (_, _) => const MessagesScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.explore,
+            builder: (_, _) => const ExploreScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.profile,
+            builder: (_, _) => const ProfileScreen(),
+          ),
         ],
       ),
 
@@ -87,30 +105,45 @@ final routerProvider = Provider<GoRouter>((ref) {
             ChatScreen(partnerId: state.pathParameters['id']!),
       ),
       GoRoute(
-          path: RoutePaths.notifications,
-          builder: (_, _) => const NotificationsScreen()),
+        path: RoutePaths.notifications,
+        builder: (_, _) => const NotificationsScreen(),
+      ),
       GoRoute(
-          path: RoutePaths.settings,
-          builder: (_, _) => const SettingsScreen()),
+        path: RoutePaths.settings,
+        builder: (_, _) => const SettingsScreen(),
+      ),
       GoRoute(
-          path: RoutePaths.devices, builder: (_, _) => const DevicesScreen()),
+        path: RoutePaths.devices,
+        builder: (_, _) => const DevicesScreen(),
+      ),
       GoRoute(
-          path: RoutePaths.subscription,
-          builder: (_, _) => const SubscriptionScreen()),
+        path: RoutePaths.subscription,
+        builder: (_, _) => const SubscriptionScreen(),
+      ),
       GoRoute(
-          path: RoutePaths.safetyReports,
-          builder: (_, _) => const SafetyReportsScreen()),
+        path: RoutePaths.safetyReports,
+        builder: (_, _) => const SafetyReportsScreen(),
+      ),
       GoRoute(
-          path: RoutePaths.deleteAccount,
-          builder: (_, _) => const DeleteAccountScreen()),
+        path: RoutePaths.blockedUsers,
+        builder: (_, _) => const BlockedUsersScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.deleteAccount,
+        builder: (_, _) => const DeleteAccountScreen(),
+      ),
 
       // ---- Legal --------------------------------------------------------
-      GoRoute(path: RoutePaths.privacy, builder: (_, _) => LegalScreen.privacy()),
+      GoRoute(
+        path: RoutePaths.privacy,
+        builder: (_, _) => const LegalHubScreen(),
+      ),
       GoRoute(path: RoutePaths.terms, builder: (_, _) => LegalScreen.terms()),
       GoRoute(path: RoutePaths.refund, builder: (_, _) => LegalScreen.refund()),
       GoRoute(
-          path: RoutePaths.childSafety,
-          builder: (_, _) => LegalScreen.childSafety()),
+        path: RoutePaths.childSafety,
+        builder: (_, _) => const ChildSafetyScreen(),
+      ),
     ],
     errorBuilder: (_, _) => const NotFoundScreen(),
   );
@@ -141,4 +174,3 @@ String _titleFor(String location) {
 List<Widget> _headerActionsFor(BuildContext context, String loc) {
   return const [];
 }
-

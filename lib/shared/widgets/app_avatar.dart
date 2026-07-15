@@ -38,18 +38,25 @@ class AppAvatar extends StatelessWidget {
               child: (photoUrl == null || photoUrl!.isEmpty)
                   ? Container(
                       color: scheme.secondary.withValues(alpha: 0.4),
-                      child: Icon(LucideIcons.user,
-                          size: size * 0.5, color: scheme.onSurface),
+                      child: Icon(
+                        LucideIcons.user,
+                        size: size * 0.5,
+                        color: scheme.onSurface,
+                      ),
                     )
                   : CachedNetworkImage(
                       imageUrl: photoUrl!,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(
-                          color: scheme.secondary.withValues(alpha: 0.3)),
+                        color: scheme.secondary.withValues(alpha: 0.3),
+                      ),
                       errorWidget: (_, _, _) => Container(
                         color: scheme.secondary.withValues(alpha: 0.4),
-                        child: Icon(LucideIcons.user,
-                            size: size * 0.5, color: scheme.onSurface),
+                        child: Icon(
+                          LucideIcons.user,
+                          size: size * 0.5,
+                          color: scheme.onSurface,
+                        ),
                       ),
                     ),
             ),
@@ -78,8 +85,11 @@ class AppAvatar extends StatelessWidget {
                   color: scheme.surface,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(LucideIcons.badgeCheck,
-                    size: size * 0.3, color: AppColors.pink),
+                child: Icon(
+                  LucideIcons.badgeCheck,
+                  size: size * 0.3,
+                  color: AppColors.pink,
+                ),
               ),
             ),
         ],
